@@ -347,7 +347,9 @@ def parseArgs (argv):
     p.add_argument ('--crab-unsigned-to-signed',
                     help=a.SUPPRESS,
                     dest='unsigned_to_signed', default=False, action='store_true')
-    
+    p.add_argument ('--crab-kingler',
+                    help=a.SUPPRESS,
+                    dest='crab-kingler', default=False, action='store_true')
     #### END CRAB
     
     args = p.parse_args (argv)

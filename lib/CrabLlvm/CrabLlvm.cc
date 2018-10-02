@@ -224,6 +224,13 @@ CrabKeepShadows ("crab-keep-shadows",
     cl::init (false),
     cl::Hidden);
 
+
+cl::opt<unsigned int>
+CrabKingler("crab-kingler", 
+             cl::desc("Use Kingler Operations or not"),
+             cl::init(false));
+
+
 // In C++11 we need to pass to std::bind "this" (if class member
 // functions are called) as well as all placeholders for each
 // argument. This is wrapper to avoid that and improve readability.
@@ -1120,16 +1127,16 @@ namespace crab_llvm {
       
       // --- checking assertions and collecting data
       if (params.check) {
-	CRAB_VERBOSE_IF(1, get_crab_os() << "Checking assertions ... \n"); 
-	typename inter_checker_t::prop_checker_ptr
-	  prop(new assert_prop_t(params.check_verbose));
-	if (params.check == NULLITY)
-	  prop.reset (new null_prop_t(params.check_verbose));      
-	inter_checker_t checker (analyzer, {prop});
-	checker.run ();
-	//CRAB_VERBOSE_IF(1, checker.show (crab::outs()));
-	results.checksdb += checker.get_all_checks();
-	CRAB_VERBOSE_IF(1, get_crab_os() << "Finished assert checking.\n"); 
+      	CRAB_VERBOSE_IF(1, get_crab_os() << "Checking assertions ... \n"); 
+      	typename inter_checker_t::prop_checker_ptr
+    	  prop(new assert_prop_t(params.check_verbose));
+      	if (params.check == NULLITY)
+      	  prop.reset (new null_prop_t(params.check_verbose));      
+      	inter_checker_t checker (analyzer, {prop});
+      	checker.run ();
+      	//CRAB_VERBOSE_IF(1, checker.show (crab::outs()));
+      	results.checksdb += checker.get_all_checks();
+      	CRAB_VERBOSE_IF(1, get_crab_os() << "Finished assert checking.\n"); 
       }
       return;
     }
@@ -1354,6 +1361,12 @@ namespace crab_llvm {
   }
   
   bool CrabLlvmPass::runOnModule (Module &M) {
+    if(false) {
+      // kingler
+      Kingler* king = new Kingler();
+      king->setDefaults();
+      king->printDomains(llvm::outs());
+    }
     #ifdef HAVE_DSA
     m_mem.reset
       (new LlvmDsaHeapAbstraction(M,&getAnalysis<SteensgaardDataStructures>(),
@@ -1429,7 +1442,9 @@ namespace crab_llvm {
         llvm::outs() << "************** BRUNCH STATS END *****************\n\n";
       }
     }
-   return false;
+    llvm::outs() << "END of runOnModule()\n";
+    llvm::outs() << CrabKingler << "\n";;
+    return false;
   }
 
   void CrabLlvmPass::getAnalysisUsage (AnalysisUsage &AU) const {
@@ -1463,7 +1478,7 @@ namespace crab_llvm {
       shadows = std::vector<varname_t>(m_vfac.get_shadow_vars().begin(),
 				       m_vfac.get_shadow_vars().end());    
     return lookup(m_pre_map, *block, shadows);
-  }   
+  }
 
   // return invariants that hold at the exit of block
   wrapper_dom_ptr
@@ -1501,7 +1516,7 @@ namespace crab_llvm {
     unsigned safe = get_total_safe_checks();
     unsigned unsafe = get_total_error_checks ();
     unsigned warning = get_total_warning_checks ();
-    std::vector<unsigned> cnts = { safe, unsafe, warning};
+    std::vector<unsigned> cnts = {safe, unsafe, warning};
     unsigned MaxValLen = 0;
     for (auto c: cnts)
       MaxValLen = std::max(MaxValLen,

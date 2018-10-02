@@ -125,7 +125,8 @@ if (GIT_FOUND)
     add_custom_target (extra DEPENDS llvm-dsa-git seahorn-llvm-git)
   endif ()
 
-  set (CRAB_REPO "https://github.com/seahorn/crab.git" CACHE STRING "crab repo")
+  # this has been changed to praveenkulkarni1996's crab and not seahorn's
+  set (CRAB_REPO "https://github.com/praveenkulkarni1996/crab.git" CACHE STRING "crab repo")
   
   if (TopLevel)
     set (CRAB_ROOT "${CMAKE_SOURCE_DIR}/crab" CACHE STRING "crab root directory")

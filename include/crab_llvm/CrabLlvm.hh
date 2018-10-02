@@ -348,6 +348,44 @@ namespace crab_llvm {
     void print_checks(llvm::raw_ostream &o) const;
   };
 
-} // end namespace 
 
+  /**
+   * Kinger: Analysis Manager
+   * A manager that will perform multiple analysis 
+   */
+    // TODO(pkulkarni): Move the definitions to CrabLlvm.cc
+  class Kingler {
+    private:
+      // defines the set of domains to use
+      std::vector<CrabDomain> domains;
+
+    public:
+      // adds the definitions of each domain into a vector
+      void addDomains(const CrabDomain dom) {
+        for(auto x: domains) {
+          if(x == dom) return;
+        }
+        domains.push_back(dom);
+      }
+
+      // initially the vector domains are not set, so I will populate it myself
+      void setDefaults(void) {
+        domains.push_back(INTERVALS);
+        domains.push_back(ZONES_SPLIT_DBM);
+      }
+
+      // prints out all the domains
+      void printDomains(llvm::raw_ostream &o) const {
+        for(auto dom: domains) {
+          o << dom << "\n";
+        }
+      }
+
+      // run multiple analyses and store the previous analyses in a map that 
+      // you can run again and again and again
+      void runAnalyses(void);
+  };
+
+} // end namespace 
 #endif
+
