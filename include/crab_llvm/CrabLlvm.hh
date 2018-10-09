@@ -356,34 +356,35 @@ namespace crab_llvm {
     // TODO(pkulkarni): Move the definitions to CrabLlvm.cc
   class Kingler {
     private:
-      // defines the set of domains to use
-      std::vector<CrabDomain> domains;
-
+      // defines the set of domains to use for each function
+      std::vector<std::pair<llvm::Function*, CrabDomain>> fdomains;
     public:
       // adds the definitions of each domain into a vector
-      void addDomains(const CrabDomain dom) {
-        for(auto x: domains) {
-          if(x == dom) return;
+      void addDomains(const llvm::Function* f, CrabDomain dom) {
+        for(auto x: fdomains) {
+          if(x.first == f and x.second == dom) return;
         }
-        domains.push_back(dom);
+        fdomains.emplace_back(std::pair<llvm::Function*, CrabDomain>({nullptr, dom}));
       }
 
       // initially the vector domains are not set, so I will populate it myself
       void setDefaults(void) {
-        domains.push_back(INTERVALS);
-        domains.push_back(ZONES_SPLIT_DBM);
+        fdomains.push_back({nullptr, INTERVALS});
+        fdomains.push_back({nullptr, ZONES_SPLIT_DBM});
       }
 
       // prints out all the domains
       void printDomains(llvm::raw_ostream &o) const {
-        for(auto dom: domains) {
-          o << dom << "\n";
+        for(auto dom: fdomains) {
+          o << "(" << dom.first << ") = " << dom.second << "\n";
         }
       }
 
       // run multiple analyses and store the previous analyses in a map that 
       // you can run again and again and again
-      void runAnalyses(void);
+      void runAnalyses(void) {
+        return;
+      }
   };
 
 } // end namespace 

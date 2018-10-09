@@ -349,7 +349,7 @@ def parseArgs (argv):
                     dest='unsigned_to_signed', default=False, action='store_true')
     p.add_argument ('--crab-kingler',
                     help=a.SUPPRESS,
-                    dest='crab-kingler', default=False, action='store_true')
+                    dest='crab_kingler', default=False, action='store_true')
     #### END CRAB
     
     args = p.parse_args (argv)
@@ -612,7 +612,8 @@ def crabllvm (in_name, out_name, args, extra_opts, cpu = -1, mem = -1):
     else:
         crabllvm_cmd.append ('--crab-store-invariants=false')
     if args.unsigned_to_signed: crabllvm_cmd.append ('--crab-unsigned-to-signed')
-    
+    if args.crab_kingler: crabllvm_cmd.append ('--crab-kingler=1')
+
     if verbose: print ' '.join (crabllvm_cmd)
 
     if args.out_name is not None:
