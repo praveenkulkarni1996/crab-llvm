@@ -1366,15 +1366,21 @@ namespace crab_llvm {
   }
 
   bool CrabLlvmPass::runOnModule (Module &M) {
-    if(true) {
+    if(CrabKingler) {
       // kingler
       Kingler* king = new Kingler();
-      king->setDefaults();
+
+      for(auto &f: M) {
+        king->addDomains(f, INTERVALS_CONGRUENCES);
+      }
+      king->setDefaults(M, INTERVALS);
       king->printDomains(llvm::outs());
+      king->testFunction();
       llvm::outs() << "TESTING PHASE BEGIN: of runOnModule()\n";
       llvm::outs() << "Kingler = " << CrabKingler << "\n";
       llvm::outs() << "Domain = " << CrabLlvmDomain << "\n";
       llvm::outs() << "TESTING PHASE END: of runOnModule()\n";
+      return 0;
     }
 #ifdef HAVE_DSA
     m_mem.reset
@@ -1545,8 +1551,33 @@ namespace crab_llvm {
 
   char crab_llvm::CrabLlvmPass::ID = 0;
 
+
 } // end namespace 
+
+
+// for Kingler functions
+namespace crab_llvm {
+
+  // this function exists merely to check the compilation
+  void Kingler::testFunction(void) {
+    sort(fdomains.begin(), fdomains.end());
+  }
+
+  // adds a new domain to run on a function
+  void Kingler::addDomains(const llvm::Function& f, CrabDomain dom) {
+    for(auto x: fdomains) {
+      if(x.first == &f and x.second == dom) return;
+    }
+    fdomains.push_back(std::make_pair(&f, dom));
+  }
+
+  // adds a default domain to each variable
+  void Kingler::setDefaults(const llvm::Module &M, CrabDomain dom) {
+    for (auto &f : M) {
+      addDomains(f, dom); 
+    }
+  }
+}
 
 static RegisterPass<crab_llvm::CrabLlvmPass> 
 X ("crab-llvm", "Infer invariants using Crab", false, false);
-

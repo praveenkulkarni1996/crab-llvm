@@ -357,22 +357,15 @@ namespace crab_llvm {
   class Kingler {
     private:
       // defines the set of domains to use for each function
-      std::vector<std::pair<llvm::Function*, CrabDomain>> fdomains;
+      // std::vector<std::pair<llvm::Function*, CrabDomain>> fdomains;
     public:
+      std::vector<std::pair<const llvm::Function*, CrabDomain>> fdomains;
+
       // adds the definitions of each domain into a vector
-      void addDomains(const llvm::Function* f, CrabDomain dom) {
-        for(auto x: fdomains) {
-          if(x.first == f and x.second == dom) return;
-        }
-        fdomains.emplace_back(std::pair<llvm::Function*, CrabDomain>({nullptr, dom}));
-      }
+      void addDomains(const llvm::Function& f, CrabDomain dom);
 
-      // initially the vector domains are not set, so I will populate it myself
-      void setDefaults(void) {
-        fdomains.push_back({nullptr, INTERVALS});
-        fdomains.push_back({nullptr, ZONES_SPLIT_DBM});
-      }
-
+      void setDefaults(const llvm::Module &M, CrabDomain dom);
+      
       // prints out all the domains
       void printDomains(llvm::raw_ostream &o) const {
         for(auto dom: fdomains) {
@@ -385,6 +378,10 @@ namespace crab_llvm {
       void runAnalyses(void) {
         return;
       }
+
+      void testFunction(void);
+
+      Kingler(void): fdomains({}) {};
   };
 
 } // end namespace 
