@@ -8,6 +8,7 @@
 #include "llvm/Pass.h"
 #include "llvm/ADT/DenseMap.h"
 #include "crab_llvm/crab_cfg.hh"
+#include "crab_llvm/CfgBuilder.hh"
 #include "crab/checkers/base_property.hpp"
 #include <boost/shared_ptr.hpp>
 
@@ -34,11 +35,11 @@ namespace crab_llvm {
        , INTERVALS_CONGRUENCES
        , BOXES
        , DIS_INTERVALS
-       /*, ZONES_SPARSE_DBM*/
+       , ZONES_SPARSE_DBM
        , ZONES_SPLIT_DBM
        , TERMS_INTERVALS
        , TERMS_DIS_INTERVALS
-         //TERMS_INTERVALS x  ZONES_SPLIT_DBM
+         // TERMS_INTERVALS x  ZONES_SPLIT_DBM
        , TERMS_ZONES 
          //(#live vars<threshold ? TERMS_INTERVALSxZONES_SPLIT_DBM, INTERVALS)
        , ADAPT_TERMS_ZONES 
@@ -104,12 +105,26 @@ namespace crab_llvm {
   class CfgManager {
     // The manager owns the pointers to cfg's
     llvm::DenseMap<const llvm::Function*, cfg_t*> m_cfg_map;
+    llvm::DenseMap<const llvm::Function*, CfgBuilder::edge_to_bb_map_t> m_edge_to_bb_map;
   public:
     CfgManager();
     ~CfgManager();
     bool has_cfg(const llvm::Function &f) const;
     cfg_ref_t operator[](const llvm::Function &f) const;
     void add(const llvm::Function &f, cfg_t *cfg);
+
+    // edge_to_bb  mappings TODO(pkulkarni): add checks before adding
+    void add_edge_to_bb(const llvm::Function &f, CfgBuilder::edge_to_bb_map_t edge_to_bb_map) {
+      m_edge_to_bb_map.insert(std::make_pair(&f, edge_to_bb_map));
+    }
+
+    CfgBuilder::edge_to_bb_map_t get_edge_to_bb_maps(const llvm::Function &f) {
+      return m_edge_to_bb_map.find(&f)->second;
+    }
+
+    cfg_t* get_cfg(const llvm::Function &f) {
+      return m_cfg_map.find(&f)->second;
+    }
   };
   
   /**
@@ -312,7 +327,7 @@ namespace crab_llvm {
 
     heap_abs_ptr get_heap_abstraction() { return m_mem; }
 
-    const AnalysisParams& get_analysis_params() { return m_params;}
+    const AnalysisParams& get_analysis_params() const { return m_params;}
     
     bool has_cfg(llvm::Function &F);
     
@@ -353,19 +368,19 @@ namespace crab_llvm {
    * Kingler: Analysis Manager
    * A manager that will perform multiple analysis 
    */
-    // TODO(pkulkarni): Move the definitions to CrabLlvm.cc
   class Kingler {
     private:
-      // defines the set of domains to use for each function
-      std::vector<std::pair<const llvm::Function*, CrabDomain>> fdomains;
+        // defines the set of domains to use for each function
+
+      std::vector<std::pair<const llvm::Function*, CrabDomain>> fdomains;     
     public:
+      CfgManager &cfg_manager;
+
 
       // adds the definitions of each domain into a vector
       void addDomains(const llvm::Function& f, CrabDomain dom);
-
       void setDefaults(const llvm::Module &M, CrabDomain dom);
-      
-      // prints out all the domains
+      void buildAllCfg();
       void printDomains(llvm::raw_ostream &o) const;
 
       // run multiple analyses and store the previous analyses in a map that 
@@ -375,9 +390,8 @@ namespace crab_llvm {
       void testFunction(void);
 
 
-      Kingler(void): fdomains({}) {};
+      Kingler(CfgManager &cfg_manager): cfg_manager(cfg_manager) {};
   };
 
 } // end namespace 
 #endif
-

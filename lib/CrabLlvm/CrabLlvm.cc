@@ -618,17 +618,20 @@ namespace crab_llvm {
     typename CfgBuilder::edge_to_bb_map_t m_edge_bb_map;
 
     template<typename Dom>
-      void analyzeCfg(const AnalysisParams &params,
-          const BasicBlock *entry,
-          const assumption_map_t &assumptions, liveness_t *live,
-          InvarianceAnalysisResults &results) {
+    void analyzeCfg(const AnalysisParams &params,
+        const BasicBlock *entry,
+        const assumption_map_t &assumptions, liveness_t *live,
+        InvarianceAnalysisResults &results) {
 
-        // -- we use the combined forward/backward analyzer
+      // -- we use the combined forward/backward analyzer
         typedef intra_forward_backward_analyzer<cfg_ref_t,Dom> intra_analyzer_t;
         // -- checkers for assertions and nullity
         typedef intra_checker<intra_analyzer_t> intra_checker_t;
         typedef assert_property_checker<intra_analyzer_t> assert_prop_t;
         typedef null_property_checker<intra_analyzer_t> null_prop_t;
+
+        CRAB_VERBOSE_IF(1,
+            get_crab_os() << "Running intra-procedural analysis with HERE.";);
 
         CRAB_VERBOSE_IF(1,
             auto fdecl = m_cfg->get_func_decl ();            
@@ -714,11 +717,11 @@ namespace crab_llvm {
           }
 
           // XXX: it must be alive when print_annotations is called.
-#if 0
+    #if 0
           assumption_naive_analysis<cfg_ref_t> assumption_analyzer(*m_cfg);
-#else
+    #else
           assumption_dataflow_analysis<cfg_ref_t> assumption_analyzer(*m_cfg);
-#endif 
+    #endif 
 
           if (params.print_assumptions) {
             // -- run first the analysis
@@ -849,26 +852,42 @@ namespace crab_llvm {
 
     public:
 
-    IntraCrabLlvm_Impl(Function &fun,
+    IntraCrabLlvm_Impl(
+        Function &fun,
         crab::cfg::tracked_precision cfg_precision,
         heap_abs_ptr mem, llvm_variable_factory &vfac,
-        CfgManager &cfg_man, const TargetLibraryInfo &tli)
+        CfgManager &cfg_man,
+        const TargetLibraryInfo &tli)
+    : m_cfg(nullptr), m_fun(fun), m_vfac(vfac) {
+      // If you had previously built the CFG and stored it, then do not 
+      // rebuild the CFG for a function. Otherwise, if the function is trackable
+      // then you should build the function CFG and store it in the manager. This
+      // function CFG will be reused when the analysis is called with a different
+      // domain next time. 
 
-      : m_cfg(nullptr), m_fun(fun), m_vfac(vfac) {
-        if (isTrackable(m_fun)) {
-          // -- build a crab cfg for func
+      // if(cfg_man.has_cfg(m_fun)) {
+      //   CRAB_VERBOSE_IF(1, llvm::outs() << "Already have CFG for " << fun.getName() << ".\n");
+      // } else 
+
+
+      if (isTrackable(m_fun)) {
+        if(cfg_man.has_cfg(m_fun)) {
+          CRAB_VERBOSE_IF(1, llvm::outs() << "Already have CFG for " << fun.getName() << ".\n");
+          m_cfg = cfg_man.get_cfg(fun);
+          m_edge_bb_map = cfg_man.get_edge_to_bb_maps(fun);
+          assert(m_cfg);
+        } else {
           CfgBuilder builder(m_fun, m_vfac, *mem, cfg_precision, true, &tli);
           m_cfg = builder.get_cfg();
           m_edge_bb_map = builder.getEdgeToBBMap();
-          CRAB_VERBOSE_IF(1, llvm::outs() << "Built Crab CFG for "
-              << fun.getName() << "\n");
           cfg_man.add(fun, m_cfg);
-
-        } else {
-          CRAB_VERBOSE_IF(1, llvm::outs() << "Cannot build CFG for "
-              << fun.getName() << "\n");
+          cfg_man.add_edge_to_bb(fun, m_edge_bb_map);
+          CRAB_VERBOSE_IF(1, llvm::outs() << "Built Crab CFG for " << fun.getName() << "\n");
         }
+      } else {
+        CRAB_VERBOSE_IF(1, llvm::outs() << "Cannot build CFG for " << fun.getName() << "\n");
       }
+    }
 
     void Analyze(AnalysisParams &params,
         const llvm::BasicBlock *entry,
@@ -876,8 +895,7 @@ namespace crab_llvm {
         InvarianceAnalysisResults &results) {
 
       if (!m_cfg) {
-        CRAB_VERBOSE_IF(1, llvm::outs() << "Skipped analysis for "
-            << m_fun.getName() << "\n");
+        CRAB_VERBOSE_IF(1, llvm::outs() << "Skipped analysis for " << m_fun.getName() << "\n");
         return;
       }
 
@@ -916,17 +934,22 @@ namespace crab_llvm {
         }
       }
 
-      if (intra_analyses.count(params.dom)) {
-        intra_analyses.at(params.dom).analyze(params, entry, assumptions,
-            (params.run_liveness)? &live : nullptr,
-            results);
-      } else {
-        crab::outs() << "Warning: abstract domain not found or enabled.\n"
-          << "Running " << intra_analyses.at(INTERVALS).name << " ...\n"; 
-        intra_analyses.at(INTERVALS).analyze(params, entry, assumptions,
-            (params.run_liveness)? &live : nullptr,
-            results);
-      }
+      // running the analysis
+      auto dom = intra_analyses.count(params.dom) ? params.dom : INTERVALS;
+      auto incl_live = params.run_liveness ? &live : nullptr;
+      intra_analyses.at(dom).analyze(params, entry, assumptions, incl_live, results);
+
+      // if (intra_analyses.count(params.dom)) {
+      //   intra_analyses.at(params.dom).analyze(params, entry, assumptions,
+      //       (params.run_liveness)? &live : nullptr,
+      //       results);
+      // } else {
+      //   crab::outs() << "Warning: abstract domain not found or enabled.\n"
+      //     << "Running " << intra_analyses.at(INTERVALS).name << " ...\n"; 
+      //   intra_analyses.at(INTERVALS).analyze(params, entry, assumptions,
+      //       (params.run_liveness)? &live : nullptr,
+      //       results);
+      // }
     }
 
     bool pathAnalyze(const AnalysisParams& params,
@@ -1406,23 +1429,31 @@ namespace crab_llvm {
     // );
 
    if(CrabKingler) {
-      Kingler* king = new Kingler();
-      CRAB_VERBOSE_IF(1, get_crab_os() << "M.size() = " << M.size() << "\n";);
+      Kingler* king = new Kingler(m_cfg_man);
+      CRAB_VERBOSE_IF(1, get_crab_os() << "Number of functions in module = M.size() = " << M.size() << "\n";);
 
-      for(auto &f: M) {
-        king->addDomains(f, INTERVALS);
-      }
-      // king->setDefaults(M, INTERVALS);
+      king->setDefaults(M, INTERVALS);
       king->printDomains(llvm::outs());
-      king->testFunction();
       king->runAnalyses();
-
 
       // I assume that no CrabInter
       llvm::outs() << "TESTING PHASE BEGIN: of runOnModule()\n";
-      llvm::outs() << "Kingler = " << CrabKingler << "\n";
       llvm::outs() << "Domain = " << CrabLlvmDomain << "\n";
       llvm::outs() << "TESTING PHASE END: of runOnModule()\n";
+
+      // build the CFGs
+      for (auto &f : M) {
+        if (!CrabInter && isTrackable(f)) {
+          IntraCrabLlvm_Impl crab(f, CrabTrackLev, m_mem, m_vfac, king->cfg_manager, *m_tli);
+        }
+      }     
+
+      for (auto &f : M) {
+        runOnFunction (f); 
+      } 
+
+
+      return 0;
     }
 
 
@@ -1437,7 +1468,7 @@ namespace crab_llvm {
                       << num_analyzed_funcs << "\n";
     );
 
-    if (CrabInter){
+    if (false and CrabInter){
       InterCrabLlvm_Impl inter_crab(M, CrabTrackLev, m_mem, m_vfac, m_cfg_man, *m_tli);
       InvarianceAnalysisResults results = { m_pre_map, m_post_map, m_checks_db};
       inter_crab.Analyze(m_params, assumption_map_t(), results);
@@ -1475,7 +1506,8 @@ namespace crab_llvm {
       }
     }
     llvm::outs() << "END of runOnModule()\n";
-    llvm::outs() << CrabKingler << "\n";;
+    llvm::outs() << CrabKingler << "\n";
+    llvm::outs() << m_pre_map.size() << "\n";
     return false;
   }
 
@@ -1504,13 +1536,13 @@ namespace crab_llvm {
 
   // return invariants that hold at the entry of block
   wrapper_dom_ptr
-    CrabLlvmPass::get_pre(const llvm::BasicBlock *block, bool keep_shadows) const {
-      std::vector<varname_t> shadows;
-      if (!keep_shadows)
-        shadows = std::vector<varname_t>(m_vfac.get_shadow_vars().begin(),
-            m_vfac.get_shadow_vars().end());    
-      return lookup(m_pre_map, *block, shadows);
-    }
+  CrabLlvmPass::get_pre(const llvm::BasicBlock *block, bool keep_shadows) const {
+    std::vector<varname_t> shadows;
+    if (!keep_shadows)
+      shadows = std::vector<varname_t>(m_vfac.get_shadow_vars().begin(),
+        m_vfac.get_shadow_vars().end());    
+    return lookup(m_pre_map, *block, shadows);
+  }
 
   // return invariants that hold at the exit of block
   wrapper_dom_ptr
@@ -1569,14 +1601,13 @@ namespace crab_llvm {
 // for Kingler functions
 namespace crab_llvm {
 
-  // this function exists merely to check the compilation
   void Kingler::testFunction(void) {
     sort(fdomains.begin(), fdomains.end());
   }
 
   bool Kingler::functionAnalysis(const Function &F, const CrabDomain dom, const AnalysisParams &m_params) const {
     if (not m_params.run_inter && isTrackable(F)) {
-      CRAB_VERBOSE_IF(1, get_crab_os() << "runOnFunction()";);
+      CRAB_VERBOSE_IF(1, get_crab_os() << "runOnFunction() with domain = " <<  dom << "\n";);
       // IntraCrabLlvm_Impl crab(F, CrabTrackLev, m_mem, m_vfac, m_cfg_man, *m_tli);
       // InvarianceAnalysisResults results = { m_pre_map, m_post_map, m_checks_db};
       // crab.Analyze(m_params, &F.getEntryBlock(), assumption_map_t(), results);
@@ -1584,7 +1615,6 @@ namespace crab_llvm {
     return false;
   }
 
-  // adds a new domain to run on a function
   void Kingler::addDomains(const llvm::Function& f, CrabDomain dom) {
     if(not isTrackable(f)) return;
     for(auto x: fdomains) {
@@ -1593,7 +1623,6 @@ namespace crab_llvm {
     fdomains.push_back(std::make_pair(&f, dom));
   }
 
-  // adds a default domain to each variable
   void Kingler::setDefaults(const llvm::Module &M, CrabDomain dom) {
     for (auto &f : M) {
       if(not isTrackable(f)) continue;
@@ -1601,15 +1630,18 @@ namespace crab_llvm {
     }
   }
 
-  // runs all the analysis from the domains
+  void Kingler::buildAllCfg(void) {
+    // TODO(pkulkarni): fill appropriately
+
+  }
+
   void Kingler::runAnalyses(void) {
     return ;
   }
 
-  // prints out some debugging information, but nothing serious.
   void Kingler::printDomains(llvm::raw_ostream &o) const {
     for(const auto dom: fdomains) {
-      o << "(" << dom.first << ") = " << dom.second << "\n";
+      o << "(" << dom.first->getName() << ") = " << dom.second << "\n";
     }
   }
 }
