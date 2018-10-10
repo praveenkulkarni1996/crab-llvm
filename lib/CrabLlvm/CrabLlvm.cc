@@ -275,6 +275,7 @@ namespace crab_llvm {
   static unsigned num_nontrivial_blocks;
   /** End global counters **/
 
+
   static bool isRelationalDomain(CrabDomain dom) {
     return (dom == ZONES_SPLIT_DBM || dom == OPT_OCT_APRON ||
         dom == PK_APRON        || dom == TERMS_ZONES);
@@ -607,6 +608,19 @@ namespace crab_llvm {
     }
   }
 
+
+  // define TODO(pkulkarni): place in header file.
+  template<typename Dom>
+  void analyzeCfg(
+    cfg_t *m_cfg,
+    const Function &m_fun,
+    const llvm_variable_factory &m_vfac,
+    const AnalysisParams &params,
+    const BasicBlock *entry,
+    const assumption_map_t &assumptions, 
+    liveness_t *live,
+    InvarianceAnalysisResults &results);
+
   /**
    * Internal implementation of the intra-procedural analysis
    **/
@@ -620,7 +634,8 @@ namespace crab_llvm {
     template<typename Dom>
     void analyzeCfg(const AnalysisParams &params,
         const BasicBlock *entry,
-        const assumption_map_t &assumptions, liveness_t *live,
+        const assumption_map_t &assumptions, 
+        liveness_t *live,
         InvarianceAnalysisResults &results) {
 
       // -- we use the combined forward/backward analyzer
@@ -1389,11 +1404,6 @@ namespace crab_llvm {
   }
 
   bool CrabLlvmPass::runOnModule (Module &M) {
-    // TODO(pkulkarni): remove this if branch after debugging.
-    if(CrabKingler) {
-      CRAB_VERBOSE_IF(1, get_crab_os() << "runOnModule() init.\n";); 
-    }
-
     #ifdef HAVE_DSA
     m_mem.reset(
       new LlvmDsaHeapAbstraction(M, 
@@ -1422,12 +1432,6 @@ namespace crab_llvm {
     m_params.check = CrabCheck;
     m_params.check_verbose = CrabCheckVerbose;
 
-    // CRAB_VERBOSE_IF(1,
-    //     get_crab_os() << "Started crab-llvm\n"; 
-    //     get_crab_os() << "Total number of analyzed functions:" \
-                          << num_analyzed_funcs << "\n";
-    // );
-
    if(CrabKingler) {
       Kingler* king = new Kingler(m_cfg_man);
       CRAB_VERBOSE_IF(1, get_crab_os() << "Number of functions in module = M.size() = " << M.size() << "\n";);
@@ -1435,6 +1439,9 @@ namespace crab_llvm {
       king->setDefaults(M, INTERVALS);
       king->printDomains(llvm::outs());
       king->runAnalyses();
+
+      // king->cfg_manager;
+
 
       // I assume that no CrabInter
       llvm::outs() << "TESTING PHASE BEGIN: of runOnModule()\n";
@@ -1446,12 +1453,38 @@ namespace crab_llvm {
         if (!CrabInter && isTrackable(f)) {
           IntraCrabLlvm_Impl crab(f, CrabTrackLev, m_mem, m_vfac, king->cfg_manager, *m_tli);
         }
-      }     
+      }  
 
-      for (auto &f : M) {
-        runOnFunction (f); 
-      } 
+      // run On Function equivalents 
+      // explicit is better than implicit
+      // TODO modmify the params before sending it to the analyze function
+      for (auto &F : M) {
+        if (!CrabInter && isTrackable(F)) {
+          IntraCrabLlvm_Impl crab(F, CrabTrackLev, m_mem, m_vfac, m_cfg_man, *m_tli);
+          InvarianceAnalysisResults results = { m_pre_map, m_post_map, m_checks_db};
 
+        // void analyzeCfg(
+        //     cfg_t *m_cfg,
+        //     const Function &m_fun,
+        //     const llvm_variable_factory &m_vfac,
+        //     const AnalysisParams &params,
+        //     const BasicBlock *entry,
+        //     const assumption_map_t &assumptions, 
+        //     liveness_t *live,
+        //     InvarianceAnalysisResults &results)
+          m_params.dom = INTERVALS;
+          m_params.run_liveness = false;
+          analyzeCfg<interval_domain_t>(
+            king->cfg_manager.get_cfg(F),
+            F,
+            m_vfac,
+            m_params, // TODO(pkulkarni): modify
+            &F.getEntryBlock(),
+            assumption_map_t(),
+            nullptr,  // TODO(pkulkarni): modify
+            results);
+        }
+      }   
 
       return 0;
     }
@@ -1505,8 +1538,6 @@ namespace crab_llvm {
         llvm::outs() << "************** BRUNCH STATS END *****************\n\n";
       }
     }
-    llvm::outs() << "END of runOnModule()\n";
-    llvm::outs() << CrabKingler << "\n";
     llvm::outs() << m_pre_map.size() << "\n";
     return false;
   }
@@ -1607,7 +1638,7 @@ namespace crab_llvm {
 
   bool Kingler::functionAnalysis(const Function &F, const CrabDomain dom, const AnalysisParams &m_params) const {
     if (not m_params.run_inter && isTrackable(F)) {
-      CRAB_VERBOSE_IF(1, get_crab_os() << "runOnFunction() with domain = " <<  dom << "\n";);
+      // CRAB_VERBOSE_IF(1, get_crab_os() << "runOnFunction() with domain = " <<  dom << "\n";);
       // IntraCrabLlvm_Impl crab(F, CrabTrackLev, m_mem, m_vfac, m_cfg_man, *m_tli);
       // InvarianceAnalysisResults results = { m_pre_map, m_post_map, m_checks_db};
       // crab.Analyze(m_params, &F.getEntryBlock(), assumption_map_t(), results);
@@ -1644,7 +1675,148 @@ namespace crab_llvm {
       o << "(" << dom.first->getName() << ") = " << dom.second << "\n";
     }
   }
-}
 
-static RegisterPass<crab_llvm::CrabLlvmPass> 
-X ("crab-llvm", "Infer invariants using Crab", false, false);
+
+template<typename Dom>
+void analyzeCfg(
+    cfg_t *m_cfg,
+    const Function &m_fun,
+    const llvm_variable_factory &m_vfac,
+    const AnalysisParams &params,
+    const BasicBlock *entry,
+    const assumption_map_t &assumptions, 
+    liveness_t *live,
+    InvarianceAnalysisResults &results) {
+
+  // -- we use the combined forward/backward analyzer
+    typedef intra_forward_backward_analyzer<cfg_ref_t,Dom> intra_analyzer_t;
+    // -- checkers for assertions and nullity
+    typedef intra_checker<intra_analyzer_t> intra_checker_t;
+    typedef assert_property_checker<intra_analyzer_t> assert_prop_t;
+    typedef null_property_checker<intra_analyzer_t> null_prop_t;
+
+    // CRAB_VERBOSE_IF(1,
+    //     get_crab_os() << "Running intra-procedural analysis with HERE.";);
+
+    // CRAB_VERBOSE_IF(1,
+    //     auto fdecl = m_cfg->get_func_decl ();            
+    //     assert (fdecl);
+    //     get_crab_os() << "Running intra-procedural analysis with " 
+    //     << "\"" << Dom::getDomainName ()  << "\""
+    //     << " for "  << (*fdecl).get_func_name ()
+    //     << "  ... \n";);
+
+    // -- run intra-procedural analysis
+    intra_analyzer_t analyzer (*m_cfg);
+    typename intra_analyzer_t::assumption_map_t crab_assumptions;
+    typedef typename intra_analyzer_t::assumption_map_t::value_type binding_t;
+    // reconstruct a crab assumption map from our assumption DenseMap
+    for (auto &kv: assumptions) {
+      Dom absval = Dom::top();
+      absval += kv.second;
+      crab_assumptions.insert(binding_t(kv.first, absval));
+    }
+
+    Dom post_cond = Dom::top();
+    if (params.check && params.run_backward) {
+      // XXX: we compute preconditions that ensure that the program
+      // fail. If those preconditions are false then we can conclude
+      // the program is safe.
+      post_cond = Dom::bottom();
+    }
+
+    analyzer.run(basic_block_label_t(entry), Dom::top(), post_cond,
+        !params.run_backward, crab_assumptions, live,
+        params.widening_delay, params.narrowing_iters, params.widening_jumpset);
+    CRAB_VERBOSE_IF(1, get_crab_os() << "Finished intra-procedural analysis.\n"); 
+
+    // -- store invariants
+    if (params.store_invariants || params.print_invars) {
+      CRAB_VERBOSE_IF(1, get_crab_os() << "Storing invariants.\n");       
+      for (basic_block_label_t bl: boost::make_iterator_range(m_cfg->label_begin(),
+            m_cfg->label_end())) {
+        const BasicBlock *B = bl.get_basic_block();
+        if (!B) continue; // we only store those which correspond to llvm basic blocks
+
+        // --- invariants that hold at the entry of the blocks
+        auto pre = analyzer.get_pre (bl);
+        update(results.premap, *B,  mkGenericAbsDomWrapper(pre));
+        // --- invariants that hold at the exit of the blocks
+        auto post = analyzer.get_post (bl);
+        update(results.postmap, *B,  mkGenericAbsDomWrapper(post)); 
+        if (params.stats) {
+          unsigned num_block_invars = 0;
+          // TODO CRAB: for boxes we would like to use
+          // to_disjunctive_linear_constraint_system() but it needs to
+          // be exposed to all domains
+          num_block_invars += pre.to_linear_constraint_system().size();
+          num_invars += num_block_invars;
+          if (num_block_invars > 0) num_nontrivial_blocks++;
+        }
+      }
+      CRAB_VERBOSE_IF(1, get_crab_os() << "All invariants stored.\n");
+    }
+
+      // -- print all cfg annotations (if any)
+      if (params.print_invars ||
+        (params.print_preconds && params.run_backward) ||
+        params.print_assumptions) {
+
+      CRAB_VERBOSE_IF(1, get_crab_os() << "Will print CFG annotations.\n");
+
+      typedef pretty_printer_impl::block_annotation block_annotation_t;
+      typedef pretty_printer_impl::invariant_annotation inv_annotation_t;
+      typedef pretty_printer_impl::nec_precondition_annotation<intra_analyzer_t> pre_annotation_t;
+      typedef pretty_printer_impl::assumption_annotation assume_annotation_t;
+      std::vector<std::unique_ptr<block_annotation_t>> pool_annotations;
+
+      llvm::outs() << "\n" << "function " << m_fun.getName() << "\n";
+      if (params.print_invars) {
+        pool_annotations.emplace_back(
+            make_unique<inv_annotation_t>(m_vfac, results.premap, results.postmap, 
+              params.keep_shadow_vars));
+      }
+
+      if (params.print_preconds && params.run_backward) {
+        pool_annotations.emplace_back(make_unique<pre_annotation_t>(analyzer));
+      }
+
+      // XXX: it must be alive when print_annotations is called.
+  #if 0
+      assumption_naive_analysis<cfg_ref_t> assumption_analyzer(*m_cfg);
+  #else
+      assumption_dataflow_analysis<cfg_ref_t> assumption_analyzer(*m_cfg);
+  #endif
+
+      if (params.print_assumptions) {
+        // -- run first the analysis
+        assumption_analyzer.exec();
+        pool_annotations.emplace_back(
+            make_unique<assume_annotation_t>(*m_cfg, &assumption_analyzer));
+      }
+      pretty_printer_impl::print_annotations(*m_cfg, pool_annotations);
+    }
+
+    CRAB_VERBOSE_IF(1, get_crab_os() << "In between comment.\n");
+
+    if (params.check) {
+      // --- checking assertions and collecting data
+      CRAB_VERBOSE_IF(1, get_crab_os() << "Checking assertions ... \n");
+      typename intra_checker_t::prop_checker_ptr
+        prop(new assert_prop_t (params.check_verbose));
+      if (params.check == NULLITY)
+        prop.reset(new null_prop_t(params.check_verbose));
+      intra_checker_t checker(analyzer, {prop});
+      checker.run();
+      CRAB_VERBOSE_IF(1,
+          llvm::outs() << "Function " << m_fun.getName() << "\n";
+          checker.show(crab::outs()));
+      results.checksdb += checker.get_all_checks();
+      CRAB_VERBOSE_IF(1, get_crab_os() << "Finished assert checking.\n");
+    }
+    return;
+  }
+}  // namespace crab_llvm
+
+static RegisterPass<crab_llvm::CrabLlvmPass>
+X("crab-llvm", "Infer invariants using Crab", false, false);

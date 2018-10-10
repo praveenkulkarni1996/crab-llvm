@@ -27,6 +27,7 @@ namespace crab_llvm {
 
 
 namespace crab_llvm {
+
    ////
    // Base numerical domains for user options
    ////
@@ -364,34 +365,26 @@ namespace crab_llvm {
   };
 
 
-  /**
-   * Kingler: Analysis Manager
-   * A manager that will perform multiple analysis 
-   */
-  class Kingler {
-    private:
-        // defines the set of domains to use for each function
-
-      std::vector<std::pair<const llvm::Function*, CrabDomain>> fdomains;     
-    public:
-      CfgManager &cfg_manager;
-
-
-      // adds the definitions of each domain into a vector
-      void addDomains(const llvm::Function& f, CrabDomain dom);
-      void setDefaults(const llvm::Module &M, CrabDomain dom);
-      void buildAllCfg();
-      void printDomains(llvm::raw_ostream &o) const;
-
-      // run multiple analyses and store the previous analyses in a map that 
-      // you can run again and again and again
-      void runAnalyses(void);
-      bool functionAnalysis(const llvm::Function &F, const CrabDomain dom, const AnalysisParams &m_params) const;
-      void testFunction(void);
-
-
-      Kingler(CfgManager &cfg_manager): cfg_manager(cfg_manager) {};
-  };
+/**
+ * Kingler: Analysis Manager
+ * A manager that will perform multiple analysis 
+ */
+class Kingler {
+ private:
+  // TODO(pkulkarni): rename to recipe
+  std::vector<std::pair<const llvm::Function*, CrabDomain>> fdomains;     
+ public:
+  CfgManager &cfg_manager;
+  // adds the definitions of each domain into a vector
+  void addDomains(const llvm::Function& f, CrabDomain dom);
+  void setDefaults(const llvm::Module &M, CrabDomain dom);
+  void buildAllCfg();
+  void printDomains(llvm::raw_ostream &o) const;
+  void runAnalyses(void);
+  bool functionAnalysis(const llvm::Function &F, const CrabDomain dom, const AnalysisParams &m_params) const;
+  void testFunction(void);
+  Kingler(CfgManager &cfg_manager): cfg_manager(cfg_manager) {};
+};
 
 } // end namespace 
 #endif
