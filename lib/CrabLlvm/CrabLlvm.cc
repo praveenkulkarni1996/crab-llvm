@@ -1366,32 +1366,21 @@ namespace crab_llvm {
   }
 
   bool CrabLlvmPass::runOnModule (Module &M) {
+    // TODO(pkulkarni): remove this if branch after debugging.
     if(CrabKingler) {
-      // kingler
-      Kingler* king = new Kingler();
-
-      for(auto &f: M) {
-        king->addDomains(f, INTERVALS_CONGRUENCES);
-      }
-      king->setDefaults(M, INTERVALS);
-      king->printDomains(llvm::outs());
-      king->testFunction();
-      llvm::outs() << "TESTING PHASE BEGIN: of runOnModule()\n";
-      llvm::outs() << "Kingler = " << CrabKingler << "\n";
-      llvm::outs() << "Domain = " << CrabLlvmDomain << "\n";
-      llvm::outs() << "TESTING PHASE END: of runOnModule()\n";
-      return 0;
+      CRAB_VERBOSE_IF(1, get_crab_os() << "runOnModule() init.\n";); 
     }
-#ifdef HAVE_DSA
-    m_mem.reset
-      (new LlvmDsaHeapAbstraction(M,&getAnalysis<SteensgaardDataStructures>(),
-                                  CrabDsaDisambiguateUnknown,
-                                  CrabDsaDisambiguatePtrCast,
-                                  CrabDsaDisambiguateExternal));
-#endif     
+
+    #ifdef HAVE_DSA
+    m_mem.reset(
+      new LlvmDsaHeapAbstraction(M, 
+        &getAnalysis<SteensgaardDataStructures>(),
+        CrabDsaDisambiguateUnknown,
+        CrabDsaDisambiguatePtrCast,
+        CrabDsaDisambiguateExternal));
+    #endif  
 
     m_tli = &getAnalysis<TargetLibraryInfoWrapperPass>().getTLI();
-
     m_params.dom = CrabLlvmDomain;
     m_params.sum_dom = CrabSummDomain;
     m_params.run_backward = CrabBackward;
@@ -1412,21 +1401,43 @@ namespace crab_llvm {
 
     // CRAB_VERBOSE_IF(1,
     //     get_crab_os() << "Started crab-llvm\n"; 
-    //     get_crab_os() << "Total number of analyzed functions:" << num_analyzed_funcs << "\n";
+    //     get_crab_os() << "Total number of analyzed functions:" \
+                          << num_analyzed_funcs << "\n";
     // );
+
+   if(CrabKingler) {
+      Kingler* king = new Kingler();
+      CRAB_VERBOSE_IF(1, get_crab_os() << "M.size() = " << M.size() << "\n";);
+
+      for(auto &f: M) {
+        king->addDomains(f, INTERVALS);
+      }
+      // king->setDefaults(M, INTERVALS);
+      king->printDomains(llvm::outs());
+      king->testFunction();
+      king->runAnalyses();
+
+
+      // I assume that no CrabInter
+      llvm::outs() << "TESTING PHASE BEGIN: of runOnModule()\n";
+      llvm::outs() << "Kingler = " << CrabKingler << "\n";
+      llvm::outs() << "Domain = " << CrabLlvmDomain << "\n";
+      llvm::outs() << "TESTING PHASE END: of runOnModule()\n";
+    }
+
 
     CRAB_VERBOSE_IF(1,
         get_crab_os() << "Started crab-llvm\n"; 
         unsigned num_analyzed_funcs = 0;
         for (auto &F : M) {
-          if (!isTrackable(F)) continue;
+          if (not isTrackable(F)) continue;
           num_analyzed_funcs++;
         }
         get_crab_os() << "Total number of analyzed functions:" 
                       << num_analyzed_funcs << "\n";
     );
 
-    if (false and CrabInter){
+    if (CrabInter){
       InterCrabLlvm_Impl inter_crab(M, CrabTrackLev, m_mem, m_vfac, m_cfg_man, *m_tli);
       InvarianceAnalysisResults results = { m_pre_map, m_post_map, m_checks_db};
       inter_crab.Analyze(m_params, assumption_map_t(), results);
@@ -1563,8 +1574,19 @@ namespace crab_llvm {
     sort(fdomains.begin(), fdomains.end());
   }
 
+  bool Kingler::functionAnalysis(const Function &F, const CrabDomain dom, const AnalysisParams &m_params) const {
+    if (not m_params.run_inter && isTrackable(F)) {
+      CRAB_VERBOSE_IF(1, get_crab_os() << "runOnFunction()";);
+      // IntraCrabLlvm_Impl crab(F, CrabTrackLev, m_mem, m_vfac, m_cfg_man, *m_tli);
+      // InvarianceAnalysisResults results = { m_pre_map, m_post_map, m_checks_db};
+      // crab.Analyze(m_params, &F.getEntryBlock(), assumption_map_t(), results);
+    }
+    return false;
+  }
+
   // adds a new domain to run on a function
   void Kingler::addDomains(const llvm::Function& f, CrabDomain dom) {
+    if(not isTrackable(f)) return;
     for(auto x: fdomains) {
       if(x.first == &f and x.second == dom) return;
     }
@@ -1574,7 +1596,20 @@ namespace crab_llvm {
   // adds a default domain to each variable
   void Kingler::setDefaults(const llvm::Module &M, CrabDomain dom) {
     for (auto &f : M) {
+      if(not isTrackable(f)) continue;
       addDomains(f, dom); 
+    }
+  }
+
+  // runs all the analysis from the domains
+  void Kingler::runAnalyses(void) {
+    return ;
+  }
+
+  // prints out some debugging information, but nothing serious.
+  void Kingler::printDomains(llvm::raw_ostream &o) const {
+    for(const auto dom: fdomains) {
+      o << "(" << dom.first << ") = " << dom.second << "\n";
     }
   }
 }
