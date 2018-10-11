@@ -1458,10 +1458,11 @@ namespace crab_llvm {
       // run On Function equivalents 
       // explicit is better than implicit
       // TODO modmify the params before sending it to the analyze function
+      assumption_map_t assumption_map;
       for (auto &F : M) {
         if (!CrabInter && isTrackable(F)) {
           IntraCrabLlvm_Impl crab(F, CrabTrackLev, m_mem, m_vfac, m_cfg_man, *m_tli);
-          InvarianceAnalysisResults results = { m_pre_map, m_post_map, m_checks_db};
+          InvarianceAnalysisResults results = {m_pre_map, m_post_map, m_checks_db};
 
         // void analyzeCfg(
         //     cfg_t *m_cfg,
@@ -1484,8 +1485,16 @@ namespace crab_llvm {
             nullptr,  // TODO(pkulkarni): modify
             results);
         }
-      }   
-
+        int counter = 0;
+        for (const auto &BB : F) {
+          llvm::outs() << "counter = " << counter << "\n";
+          llvm::outs() << "PRE  :" << F.getName() << " : " << (get_pre(&BB, false)->to_linear_constraints()).size() << "\n";
+          llvm::outs() << "POST :" << F.getName() << " : " << (get_post(&BB, false)->to_linear_constraints()).size() << "\n";
+          (get_post(&BB, false)->to_linear_constraints()).write(get_crab_os());
+          assumption_map[F] = get_post(&BB, false)->to_linear_constraints();
+          // llvm::outs() << "POST :" << F.getName() << " : " << (get_post(&BB, false)->to_linear_constraints()).size() << "\n";
+        }
+      }
       return 0;
     }
 
