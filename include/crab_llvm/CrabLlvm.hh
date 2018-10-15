@@ -374,16 +374,24 @@ class Kingler {
   // TODO(pkulkarni): rename to recipe
   std::vector<std::pair<const llvm::Function*, CrabDomain>> fdomains;     
  public:
+  // TODO(pkulkarni): move to private
   CfgManager &cfg_manager;
+  variable_factory_t &m_vfac;
   // adds the definitions of each domain into a vector
   void addDomains(const llvm::Function& f, CrabDomain dom);
   void setDefaults(const llvm::Module &M, CrabDomain dom);
-  void buildAllCfg();
+  // void buildAllCfg(llvm::Module &M);
+  void buildAllCfg(llvm::Module &M,
+    boost::shared_ptr<HeapAbstraction> heap_abs_ptr,
+    const llvm::TargetLibraryInfo &tli);
   void printDomains(llvm::raw_ostream &o) const;
   void runAnalyses(void);
   bool functionAnalysis(const llvm::Function &F, const CrabDomain dom, const AnalysisParams &m_params) const;
   void testFunction(void);
-  Kingler(CfgManager &cfg_manager): cfg_manager(cfg_manager) {};
+  Kingler(CfgManager &cfg_manager, variable_factory_t &m_vfac):
+    cfg_manager(cfg_manager),
+    m_vfac(m_vfac)
+  {};
 };
 
 } // end namespace 

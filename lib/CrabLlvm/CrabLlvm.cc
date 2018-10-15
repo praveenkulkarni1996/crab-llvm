@@ -1433,9 +1433,15 @@ namespace crab_llvm {
     m_params.check_verbose = CrabCheckVerbose;
 
    if(CrabKingler) {
-      Kingler* king = new Kingler(m_cfg_man);
+      Kingler* king = new Kingler(m_cfg_man, m_vfac);
       CRAB_VERBOSE_IF(1, get_crab_os() << "Number of functions in module = M.size() = " << M.size() << "\n";);
 
+      /*
+      void Kingler::buildAllCfg(Module &M,
+          crab::cfg::tracked_precision cfg_precision,
+          heap_abs_ptr mem, &m_tli);
+      */
+      // king->buildAllCfg(M, heap_abs_ptr mem, tli);
       king->setDefaults(M, INTERVALS);
       king->printDomains(llvm::outs());
       king->runAnalyses();
@@ -1475,9 +1481,9 @@ namespace crab_llvm {
           //     liveness_t *live,
           //     InvarianceAnalysisResults &results)
 
-          m_params.dom = ZONES_SPLIT_DBM;
+          m_params.dom = BOXES;
           InvarianceAnalysisResults results2 = {m_pre_map, m_post_map, m_checks_db};
-          analyzeCfg<split_dbm_domain_t>(
+          analyzeCfg<boxes_domain_t>(
             king->cfg_manager.get_cfg(F),
             F,
             m_vfac,
@@ -1487,18 +1493,19 @@ namespace crab_llvm {
             nullptr,  // TODO(pkulkarni): modify
             results2
           );
+          print_checks(llvm::outs());
 
-          m_params.dom = INTERVALS;
-          m_params.run_liveness = false;
-          analyzeCfg<interval_domain_t>(
-            king->cfg_manager.get_cfg(F),
-            F,
-            m_vfac,
-            m_params, // TODO(pkulkarni): modify
-            &F.getEntryBlock(),
-            assumption_map_t(),
-            nullptr,  // TODO(pkulkarni): modify
-            results);
+          // m_params.dom = INTERVALS;
+          // m_params.run_liveness = false;
+          // analyzeCfg<interval_domain_t>(
+          //   king->cfg_manager.get_cfg(F),
+          //   F,
+          //   m_vfac,
+          //   m_params, // TODO(pkulkarni): modify
+          //   &F.getEntryBlock(),
+          //   assumption_map_t(),
+          //   nullptr,  // TODO(pkulkarni): modify
+          //   results);
 
           int counter = 0;
           for (const auto &BB : F) {
@@ -1533,7 +1540,7 @@ namespace crab_llvm {
             m_vfac,
             m_params, // TODO(pkulkarni): modify
             &F.getEntryBlock(),
-            assumption_map_t(),
+            assumption_map,
             nullptr,  // TODO(pkulkarni): modify
             results);
 
@@ -1713,21 +1720,34 @@ namespace crab_llvm {
       addDomains(f, dom); 
     }
   }
+  /*
+    IntraCrabLlvm_Impl(
+        Function &fun,
+        crab::cfg::tracked_precision cfg_precision,
+        heap_abs_ptr mem, llvm_variable_factory &vfac,
+        CfgManager &cfg_man,
+        const TargetLibraryInfo &tli)
+  */
 
-  void Kingler::buildAllCfg(void) {
-    // TODO(pkulkarni): fill appropriately
-
-  }
-
-  void Kingler::runAnalyses(void) {
-    return ;
-  }
-
-  void Kingler::printDomains(llvm::raw_ostream &o) const {
-    for(const auto dom: fdomains) {
-      o << "(" << dom.first->getName() << ") = " << dom.second << "\n";
+void Kingler::buildAllCfg(Module &M,
+    heap_abs_ptr mem,
+    const TargetLibraryInfo &tli) {
+  for (auto &f : M) {
+    if (isTrackable(f)) {
+      IntraCrabLlvm_Impl crab(f, CrabTrackLev, mem, m_vfac, cfg_manager, tli);
     }
   }
+}
+
+void Kingler::runAnalyses(void) {
+  return ;
+}
+
+void Kingler::printDomains(llvm::raw_ostream &o) const {
+  for(const auto dom: fdomains) {
+    o << "(" << dom.first->getName() << ") = " << dom.second << "\n";
+  }
+}
 
 
 template<typename Dom>
@@ -1873,3 +1893,4 @@ void analyzeCfg(
 
 static RegisterPass<crab_llvm::CrabLlvmPass>
 X("crab-llvm", "Infer invariants using Crab", false, false);
+
