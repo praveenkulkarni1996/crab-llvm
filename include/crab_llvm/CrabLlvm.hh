@@ -379,7 +379,6 @@ class Kingler {
   variable_factory_t &m_vfac;
   // adds the definitions of each domain into a vector
   void addDomains(const llvm::Function& f, CrabDomain dom);
-  void setDefaults(const llvm::Module &M, CrabDomain dom);
   // void buildAllCfg(llvm::Module &M);
   void buildAllCfg(llvm::Module &M,
     boost::shared_ptr<HeapAbstraction> heap_abs_ptr,

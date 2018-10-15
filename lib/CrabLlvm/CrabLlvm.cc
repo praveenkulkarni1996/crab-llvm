@@ -1441,18 +1441,9 @@ namespace crab_llvm {
           crab::cfg::tracked_precision cfg_precision,
           heap_abs_ptr mem, &m_tli);
       */
-      // king->buildAllCfg(M, heap_abs_ptr mem, tli);
-      king->setDefaults(M, INTERVALS);
+      king->buildAllCfg(M, m_mem, *m_tli);
       king->printDomains(llvm::outs());
       king->runAnalyses();
-
-      // king->cfg_manager;
-
-
-      // I assume that no CrabInter
-      llvm::outs() << "TESTING PHASE BEGIN: of runOnModule()\n";
-      llvm::outs() << "Domain = " << CrabLlvmDomain << "\n";
-      llvm::outs() << "TESTING PHASE END: of runOnModule()\n";
 
       // build the CFGs
       for (auto &f : M) {
@@ -1463,7 +1454,7 @@ namespace crab_llvm {
 
       // run On Function equivalents 
       // explicit is better than implicit
-      // TODO modmify the params before sending it to the analyze function
+      // TODO modify the params before sending it to the analyze function
       typedef typename assumption_map_t::value_type binding_t;
       assumption_map_t assumption_map;
       for (auto &F : M) {
@@ -1692,42 +1683,27 @@ namespace crab_llvm {
 // for Kingler functions
 namespace crab_llvm {
 
-  void Kingler::testFunction(void) {
-    sort(fdomains.begin(), fdomains.end());
-  }
+void Kingler::testFunction(void) {
+  sort(fdomains.begin(), fdomains.end());
+}
 
-  bool Kingler::functionAnalysis(const Function &F, const CrabDomain dom, const AnalysisParams &m_params) const {
-    if (not m_params.run_inter && isTrackable(F)) {
-      // CRAB_VERBOSE_IF(1, get_crab_os() << "runOnFunction() with domain = " <<  dom << "\n";);
-      // IntraCrabLlvm_Impl crab(F, CrabTrackLev, m_mem, m_vfac, m_cfg_man, *m_tli);
-      // InvarianceAnalysisResults results = { m_pre_map, m_post_map, m_checks_db};
-      // crab.Analyze(m_params, &F.getEntryBlock(), assumption_map_t(), results);
-    }
-    return false;
+bool Kingler::functionAnalysis(const Function &F, const CrabDomain dom, const AnalysisParams &m_params) const {
+  if (not m_params.run_inter && isTrackable(F)) {
+    // CRAB_VERBOSE_IF(1, get_crab_os() << "runOnFunction() with domain = " <<  dom << "\n";);
+    // IntraCrabLlvm_Impl crab(F, CrabTrackLev, m_mem, m_vfac, m_cfg_man, *m_tli);
+    // InvarianceAnalysisResults results = { m_pre_map, m_post_map, m_checks_db};
+    // crab.Analyze(m_params, &F.getEntryBlock(), assumption_map_t(), results);
   }
+  return false;
+}
 
-  void Kingler::addDomains(const llvm::Function& f, CrabDomain dom) {
-    if(not isTrackable(f)) return;
-    for(auto x: fdomains) {
-      if(x.first == &f and x.second == dom) return;
-    }
-    fdomains.push_back(std::make_pair(&f, dom));
+void Kingler::addDomains(const llvm::Function& f, CrabDomain dom) {
+  if(not isTrackable(f)) return;
+  for(auto x: fdomains) {
+    if(x.first == &f and x.second == dom) return;
   }
-
-  void Kingler::setDefaults(const llvm::Module &M, CrabDomain dom) {
-    for (auto &f : M) {
-      if(not isTrackable(f)) continue;
-      addDomains(f, dom); 
-    }
-  }
-  /*
-    IntraCrabLlvm_Impl(
-        Function &fun,
-        crab::cfg::tracked_precision cfg_precision,
-        heap_abs_ptr mem, llvm_variable_factory &vfac,
-        CfgManager &cfg_man,
-        const TargetLibraryInfo &tli)
-  */
+  fdomains.push_back(std::make_pair(&f, dom));
+}
 
 void Kingler::buildAllCfg(Module &M,
     heap_abs_ptr mem,
