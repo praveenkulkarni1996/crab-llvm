@@ -386,7 +386,6 @@ class Kingler {
   void printDomains(llvm::raw_ostream &o) const;
   void runAnalyses(void);
   bool functionAnalysis(const llvm::Function &F, const CrabDomain dom, const AnalysisParams &m_params) const;
-  void testFunction(void);
   Kingler(CfgManager &cfg_manager, variable_factory_t &m_vfac):
     cfg_manager(cfg_manager),
     m_vfac(m_vfac)

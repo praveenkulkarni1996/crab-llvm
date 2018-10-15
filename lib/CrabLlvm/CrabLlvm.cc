@@ -1436,25 +1436,12 @@ namespace crab_llvm {
       Kingler* king = new Kingler(m_cfg_man, m_vfac);
       CRAB_VERBOSE_IF(1, get_crab_os() << "Number of functions in module = M.size() = " << M.size() << "\n";);
 
-      /*
-      void Kingler::buildAllCfg(Module &M,
-          crab::cfg::tracked_precision cfg_precision,
-          heap_abs_ptr mem, &m_tli);
-      */
       king->buildAllCfg(M, m_mem, *m_tli);
       king->printDomains(llvm::outs());
       king->runAnalyses();
 
-      // build the CFGs
-      for (auto &f : M) {
-        if (!CrabInter && isTrackable(f)) {
-          IntraCrabLlvm_Impl crab(f, CrabTrackLev, m_mem, m_vfac, king->cfg_manager, *m_tli);
-        }
-      }  
-
       // run On Function equivalents 
       // explicit is better than implicit
-      // TODO modify the params before sending it to the analyze function
       typedef typename assumption_map_t::value_type binding_t;
       assumption_map_t assumption_map;
       for (auto &F : M) {
@@ -1472,15 +1459,15 @@ namespace crab_llvm {
           //     liveness_t *live,
           //     InvarianceAnalysisResults &results)
 
-          m_params.dom = BOXES;
+          m_params.dom = INTERVALS;
           InvarianceAnalysisResults results2 = {m_pre_map, m_post_map, m_checks_db};
-          analyzeCfg<boxes_domain_t>(
+          analyzeCfg<interval_domain_t>(
             king->cfg_manager.get_cfg(F),
             F,
             m_vfac,
             m_params, // TODO(pkulkarni): modify
             &F.getEntryBlock(),
-            assumption_map_t(),
+            assumption_map,
             nullptr,  // TODO(pkulkarni): modify
             results2
           );
@@ -1523,9 +1510,9 @@ namespace crab_llvm {
           //   results2
           // );
 
-          m_params.dom = INTERVALS;
+          m_params.dom = BOXES;
           m_params.run_liveness = false;
-          analyzeCfg<interval_domain_t>(
+          analyzeCfg<boxes_domain_t>(
             king->cfg_manager.get_cfg(F),
             F,
             m_vfac,
@@ -1534,7 +1521,6 @@ namespace crab_llvm {
             assumption_map,
             nullptr,  // TODO(pkulkarni): modify
             results);
-
         }
       }
       return 0;
@@ -1552,7 +1538,7 @@ namespace crab_llvm {
                     << num_analyzed_funcs << "\n";
     );
 
-    if (CrabInter){
+    if (false and CrabInter){
       InterCrabLlvm_Impl inter_crab(M, CrabTrackLev, m_mem, m_vfac, m_cfg_man, *m_tli);
       InvarianceAnalysisResults results = { m_pre_map, m_post_map, m_checks_db};
       inter_crab.Analyze(m_params, assumption_map_t(), results);
@@ -1682,10 +1668,6 @@ namespace crab_llvm {
 
 // for Kingler functions
 namespace crab_llvm {
-
-void Kingler::testFunction(void) {
-  sort(fdomains.begin(), fdomains.end());
-}
 
 bool Kingler::functionAnalysis(const Function &F, const CrabDomain dom, const AnalysisParams &m_params) const {
   if (not m_params.run_inter && isTrackable(F)) {
