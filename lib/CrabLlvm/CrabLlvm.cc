@@ -1437,13 +1437,51 @@ namespace crab_llvm {
       CRAB_VERBOSE_IF(1, get_crab_os() << "Number of functions in module = M.size() = " << M.size() << "\n";);
 
       king->buildAllCfg(M, m_mem, *m_tli);
-      king->printDomains(llvm::outs());
-      king->runAnalyses();
+      // king->printDomains(llvm::outs());
+      // king->runAnalyses();
+
+
+      std::vector<std::pair<llvm::Function&, CrabDomain> > recipe;
+
+
+
+      
 
       // run On Function equivalents 
       // explicit is better than implicit
       typedef typename assumption_map_t::value_type binding_t;
       assumption_map_t assumption_map;
+      assumption_map_t amap;
+
+      for(auto &F: M) {
+        if(isTrackable(F)) {
+          recipe.push_back({F, INTERVALS});
+          recipe.push_back({F, BOXES});
+        }
+      }
+
+      for(auto &ingredient: recipe) {
+        llvm::Function &F = ingredient.first;
+        CrabDomain domain = ingredient.second;
+        llvm::outs() << ingredient.first.getName() << ": " << ingredient.second << "\n";
+
+        IntraCrabLlvm_Impl crab(ingredient.first, CrabTrackLev, m_mem, m_vfac, m_cfg_man, *m_tli);
+        // InvarianceAnalysisResults results = {m_pre_map, m_post_map, m_checks_db}; 
+
+
+        m_params.dom = domain;
+        m_params.run_liveness = false;
+        InvarianceAnalysisResults res = {m_pre_map, m_post_map, m_checks_db};
+
+        switch (domain) {
+          case INTERVALS: analyzeCfg<interval_domain_t>(m_cfg_man.get_cfg(F), F, m_vfac, m_params, &F.getEntryBlock(), amap, nullptr,  res); break;
+          case BOXES: analyzeCfg<boxes_domain_t>(m_cfg_man.get_cfg(F), F, m_vfac, m_params, &F.getEntryBlock(), amap, nullptr,  res); break;
+          default:
+            assert(false);
+        }
+      }
+
+      return 0;
       for (auto &F : M) {
         if (!CrabInter && isTrackable(F)) {
           IntraCrabLlvm_Impl crab(F, CrabTrackLev, m_mem, m_vfac, m_cfg_man, *m_tli);
@@ -1527,55 +1565,55 @@ namespace crab_llvm {
     }
 
 
-    CRAB_VERBOSE_IF(1,
-      get_crab_os() << "Started crab-llvm\n"; 
-      unsigned num_analyzed_funcs = 0;
-      for (auto &F : M) {
-        if (not isTrackable(F)) continue;
-        num_analyzed_funcs++;
-      }
-      get_crab_os() << "Total number of analyzed functions:" 
-                    << num_analyzed_funcs << "\n";
-    );
+    // CRAB_VERBOSE_IF(1,
+    //   get_crab_os() << "Started crab-llvm\n"; 
+    //   unsigned num_analyzed_funcs = 0;
+    //   for (auto &F : M) {
+    //     if (not isTrackable(F)) continue;
+    //     num_analyzed_funcs++;
+    //   }
+    //   get_crab_os() << "Total number of analyzed functions:" 
+    //                 << num_analyzed_funcs << "\n";
+    // );
 
-    if (false and CrabInter){
-      InterCrabLlvm_Impl inter_crab(M, CrabTrackLev, m_mem, m_vfac, m_cfg_man, *m_tli);
-      InvarianceAnalysisResults results = { m_pre_map, m_post_map, m_checks_db};
-      inter_crab.Analyze(m_params, assumption_map_t(), results);
-    } else {
-      for (auto &f : M) {
-        runOnFunction (f); 
-      }
-    }
+    // if (false and CrabInter){
+    //   InterCrabLlvm_Impl inter_crab(M, CrabTrackLev, m_mem, m_vfac, m_cfg_man, *m_tli);
+    //   InvarianceAnalysisResults results = { m_pre_map, m_post_map, m_checks_db};
+    //   inter_crab.Analyze(m_params, assumption_map_t(), results);
+    // } else {
+    //   for (auto &f : M) {
+    //     runOnFunction (f); 
+    //   }
+    // }
 
-    if (CrabStats) {
-      crab::CrabStats::PrintBrunch (crab::outs());
-    }
+    // if (CrabStats) {
+    //   crab::CrabStats::PrintBrunch (crab::outs());
+    // }
 
-    if (CrabCheck) {
-      llvm::outs() << "\n************** ANALYSIS RESULTS ****************\n";
-      print_checks(llvm::outs());
-      llvm::outs() << "************** ANALYSIS RESULTS END*************\n";
+    // if (CrabCheck) {
+    //   llvm::outs() << "\n************** ANALYSIS RESULTS ****************\n";
+    //   print_checks(llvm::outs());
+    //   llvm::outs() << "************** ANALYSIS RESULTS END*************\n";
 
-      if (CrabStats) {         
-        llvm::outs() << "\n************** BRUNCH STATS ********************\n";
-        if (get_total_checks() == 0) {
-          llvm::outs() << "BRUNCH_STAT Result NOCHECKS\n";
-        } else if (get_total_error_checks() > 0) {
-          llvm::outs() << "BRUNCH_STAT Result FALSE\n";
-        } else if (get_total_warning_checks() == 0) {
-          llvm::outs() << "BRUNCH_STAT Result TRUE\n";
-        } else {
-          llvm::outs() << "BRUNCH_STAT Result INCONCLUSIVE\n";
-        }
-        llvm::outs() << "BRUNCH_STAT NumOfBlocksWithInvariants "
-          << num_nontrivial_blocks << "\n";
-        llvm::outs() << "BRUNCH_STAT SizeOfInvariants "       
-          << num_invars << "\n";
-        llvm::outs() << "************** BRUNCH STATS END *****************\n\n";
-      }
-    }
-    llvm::outs() << m_pre_map.size() << "\n";
+    //   if (CrabStats) {         
+    //     llvm::outs() << "\n************** BRUNCH STATS ********************\n";
+    //     if (get_total_checks() == 0) {
+    //       llvm::outs() << "BRUNCH_STAT Result NOCHECKS\n";
+    //     } else if (get_total_error_checks() > 0) {
+    //       llvm::outs() << "BRUNCH_STAT Result FALSE\n";
+    //     } else if (get_total_warning_checks() == 0) {
+    //       llvm::outs() << "BRUNCH_STAT Result TRUE\n";
+    //     } else {
+    //       llvm::outs() << "BRUNCH_STAT Result INCONCLUSIVE\n";
+    //     }
+    //     llvm::outs() << "BRUNCH_STAT NumOfBlocksWithInvariants "
+    //       << num_nontrivial_blocks << "\n";
+    //     llvm::outs() << "BRUNCH_STAT SizeOfInvariants "       
+    //       << num_invars << "\n";
+    //     llvm::outs() << "************** BRUNCH STATS END *****************\n\n";
+    //   }
+    // }
+    // llvm::outs() << m_pre_map.size() << "\n";
     return false;
   }
 
