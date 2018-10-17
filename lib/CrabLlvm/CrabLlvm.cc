@@ -1422,7 +1422,7 @@ namespace crab_llvm {
     m_params.widening_delay = CrabWideningDelay;
     m_params.narrowing_iters = CrabNarrowingIters;
     m_params.widening_jumpset = CrabWideningJumpSet;
-    m_params.stats = CrabStats;
+    m_params.stats = true or CrabStats;
     m_params.print_invars = CrabPrintAns;
     m_params.print_preconds = CrabPrintPreCond;
     m_params.print_assumptions = CrabPrintAssumptions;
@@ -1797,6 +1797,8 @@ void analyzeCfg(
     analyzer.run(basic_block_label_t(entry), Dom::top(), post_cond,
         !params.run_backward, crab_assumptions, live,
         params.widening_delay, params.narrowing_iters, params.widening_jumpset);
+
+    get_crab_os() << "Praveen was here\n";
     CRAB_VERBOSE_IF(1, get_crab_os() << "Finished intra-procedural analysis.\n"); 
 
     // -- store invariants
@@ -1819,6 +1821,7 @@ void analyzeCfg(
           // to_disjunctive_linear_constraint_system() but it needs to
           // be exposed to all domains
           num_block_invars += pre.to_linear_constraint_system().size();
+          get_crab_os() << "Num block invariants = " << num_block_invars << "\n"; 
           num_invars += num_block_invars;
           if (num_block_invars > 0) num_nontrivial_blocks++;
         }
