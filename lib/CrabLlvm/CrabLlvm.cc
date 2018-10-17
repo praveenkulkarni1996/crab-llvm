@@ -1475,17 +1475,6 @@ namespace crab_llvm {
 
       recipeBuilder(M, recipe);
 
-      // for(auto &F: M) {
-      //   if(isTrackable(F)) {
-      //     recipe.push_back({F, INTERVALS});
-
-
-
-      //     // recipe.push_back({F, BOXES});
-      //     // recipe.push_back({F, ZONES_SPLIT_DBM});
-      //   }
-      // }
-
       for(auto &ingredient: recipe) {
         llvm::Function &F = ingredient.first;
         CrabDomain domain = ingredient.second;
@@ -1539,88 +1528,6 @@ namespace crab_llvm {
         llvm::outs() << f.getName() << " on " << dom_to_str(dom) << ": \t";
         llvm::outs() << " = " << qres.safe << ", " << qres.error << ", " << qres.warning << "\n";
       }
-
-
-      // return 0;
-      // for (auto &F : M) {
-      //   if (!CrabInter && isTrackable(F)) {
-      //     IntraCrabLlvm_Impl crab(F, CrabTrackLev, m_mem, m_vfac, m_cfg_man, *m_tli);
-      //     InvarianceAnalysisResults results = {m_pre_map, m_post_map, m_checks_db};
-      //     // definiton of analyzeCFG
-      //     // void analyzeCfg(
-      //     //     cfg_t *m_cfg,
-      //     //     const Function &m_fun,
-      //     //     const llvm_variable_factory &m_vfac,
-      //     //     const AnalysisParams &params,
-      //     //     const BasicBlock *entry,
-      //     //     const assumption_map_t &assumptions, 
-      //     //     liveness_t *live,
-      //     //     InvarianceAnalysisResults &results)
-
-      //     m_params.dom = INTERVALS;
-      //     InvarianceAnalysisResults results2 = {m_pre_map, m_post_map, m_checks_db};
-      //     analyzeCfg<interval_domain_t>(
-      //       king->cfg_manager.get_cfg(F),
-      //       F,
-      //       m_vfac,
-      //       m_params, // TODO(pkulkarni): modify
-      //       &F.getEntryBlock(),
-      //       assumption_map,
-      //       nullptr,  // TODO(pkulkarni): modify
-      //       results2
-      //     );
-      //     print_checks(llvm::outs());
-
-      //     // m_params.dom = INTERVALS;
-      //     // m_params.run_liveness = false;
-      //     // analyzeCfg<interval_domain_t>(
-      //     //   king->cfg_manager.get_cfg(F),
-      //     //   F,
-      //     //   m_vfac,
-      //     //   m_params, // TODO(pkulkarni): modify
-      //     //   &F.getEntryBlock(),
-      //     //   assumption_map_t(),
-      //     //   nullptr,  // TODO(pkulkarni): modify
-      //     //   results);
-
-      //     int counter = 0;
-      //     for (const auto &BB : F) {
-      //       llvm::outs() << "counter = " << counter << "\n";
-      //       llvm::outs() << "PRE  :" << F.getName() << " : " << (get_pre(&BB, false)->to_linear_constraints()).size() << "\n";
-      //       (get_pre(&BB, false)->to_linear_constraints()).write(get_crab_os());
-      //       llvm::outs() << "POST :" << F.getName() << " : " << (get_post(&BB, false)->to_linear_constraints()).size() << "\n";
-      //       (get_post(&BB, false)->to_linear_constraints()).write(get_crab_os());
-      //       auto constraints = get_post(&BB, false)->to_linear_constraints();
-      //       assumption_map.insert(std::make_pair(&BB, constraints));
-      //     }
-      //     llvm::outs() << "AGAIN ONE  MORE TIME ....\n";
-
-      //     // m_params.dom = ZONES_SPLIT_DBM;
-      //     // InvarianceAnalysisResults results2 = {m_pre_map, m_post_map, m_checks_db};
-      //     // analyzeCfg<split_dbm_domain_t>(
-      //     //   king->cfg_manager.get_cfg(F),
-      //     //   F,
-      //     //   m_vfac,
-      //     //   m_params, // TODO(pkulkarni): modify
-      //     //   &F.getEntryBlock(),
-      //     //   assumption_map_t(),
-      //     //   nullptr,  // TODO(pkulkarni): modify
-      //     //   results2
-      //     // );
-
-      //     m_params.dom = BOXES;
-      //     m_params.run_liveness = false;
-      //     analyzeCfg<boxes_domain_t>(
-      //       king->cfg_manager.get_cfg(F),
-      //       F,
-      //       m_vfac,
-      //       m_params, // TODO(pkulkarni): modify
-      //       &F.getEntryBlock(),
-      //       assumption_map,
-      //       nullptr,  // TODO(pkulkarni): modify
-      //       results);
-      //   }
-      // }
       return false;
     }
 
