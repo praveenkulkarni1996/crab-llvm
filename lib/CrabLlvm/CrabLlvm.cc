@@ -268,6 +268,21 @@ namespace crab_llvm {
   typedef typename IntraCrabLlvm::checks_db_t checks_db_t;
   typedef typename IntraCrabLlvm::invariant_map_t invariant_map_t;
   typedef typename IntraCrabLlvm::heap_abs_ptr heap_abs_ptr;
+
+
+  class QuickResults { 
+   public:
+    int safe, error, warning, seconds; 
+
+    QuickResults(int safe, int error, int warning, int seconds): 
+      safe(safe), error(error), warning(warning), seconds(seconds) 
+      {}
+
+  };
+
+  typedef std::pair<llvm::Function&, CrabDomain> ingredient_t;
+  typedef std::vector<std::pair<llvm::Function&, CrabDomain>> recipe_t;
+  typedef std::vector<std::pair<ingredient_t, QuickResults>> recipe_results_t; 
   /** End typedefs **/
 
   /** Begin global counters **/
@@ -1403,6 +1418,17 @@ namespace crab_llvm {
     return false;
   }
 
+  void recipeBuilder(Module &M, recipe_t &recipe) {
+    std::vector<CrabDomain> domains = {INTERVALS, PK_APRON};
+    for (llvm::Function &F: M) {
+      if (isTrackable(F)) {
+        for (CrabDomain domain : domains) {
+          recipe.push_back({F, domain});
+        }
+      }
+    }
+  }
+
   bool CrabLlvmPass::runOnModule (Module &M) {
     #ifdef HAVE_DSA
     m_mem.reset(
@@ -1422,7 +1448,7 @@ namespace crab_llvm {
     m_params.widening_delay = CrabWideningDelay;
     m_params.narrowing_iters = CrabNarrowingIters;
     m_params.widening_jumpset = CrabWideningJumpSet;
-    m_params.stats = true or CrabStats;
+    m_params.stats = true or CrabStats; // TODO(pkulkarni): set to defaults.
     m_params.print_invars = CrabPrintAns;
     m_params.print_preconds = CrabPrintPreCond;
     m_params.print_assumptions = CrabPrintAssumptions;
@@ -1438,7 +1464,8 @@ namespace crab_llvm {
 
       king->buildAllCfg(M, m_mem, *m_tli);
 
-      std::vector<std::pair<llvm::Function&, CrabDomain> > recipe;
+      recipe_t recipe;
+      recipe_results_t recipe_results;
 
       typedef typename assumption_map_t::value_type binding_t;
       assumption_map_t assumption_map;
@@ -1447,8 +1474,8 @@ namespace crab_llvm {
       for(auto &F: M) {
         if(isTrackable(F)) {
           recipe.push_back({F, INTERVALS});
-          recipe.push_back({F, BOXES});
-          recipe.push_back({F, ZONES_SPLIT_DBM});
+          // recipe.push_back({F, BOXES});
+          // recipe.push_back({F, ZONES_SPLIT_DBM});
         }
       }
 
@@ -1479,6 +1506,22 @@ namespace crab_llvm {
             assert(false);
         }
         print_checks(llvm::outs());
+        // NOTES: 
+        // m_checks_db  :: class(set<pair<crab::cfg::debug_info, check_kind_t>>);
+        // check_kind_t :: enum { _SAFE, _ERR, _WARN, _UNREACH }; 
+        // llvm::outs() << "m_checks_db size = : " << typeid(m_checks_db).name() << "\t:";
+        // llvm::outs() << m_checks_db.m_db.size() << "\n";
+
+        // store the results of the checks of the analysis
+
+        QuickResults qres(get_total_safe_checks(), get_total_error_checks(), 
+                          get_total_warning_checks(), 0); 
+        recipe_results.push_back(std::make_pair(ingredient, qres));
+        releaseMemory();
+
+        // invariant_map_t = llvm::DenseMap<const llvm::BasicBlock*, wrapper_dom_ptr>
+        // m_pre_map :: invariant_map_t
+        // m_post_map :: invariant_map_t
       }
 
       // return 0;
@@ -1798,7 +1841,6 @@ void analyzeCfg(
         !params.run_backward, crab_assumptions, live,
         params.widening_delay, params.narrowing_iters, params.widening_jumpset);
 
-    get_crab_os() << "Praveen was here\n";
     CRAB_VERBOSE_IF(1, get_crab_os() << "Finished intra-procedural analysis.\n"); 
 
     // -- store invariants
@@ -1821,7 +1863,7 @@ void analyzeCfg(
           // to_disjunctive_linear_constraint_system() but it needs to
           // be exposed to all domains
           num_block_invars += pre.to_linear_constraint_system().size();
-          get_crab_os() << "Num block invariants = " << num_block_invars << "\n"; 
+          // get_crab_os() << "Num block invariants = " << num_block_invars << "\n"; 
           num_invars += num_block_invars;
           if (num_block_invars > 0) num_nontrivial_blocks++;
         }
@@ -1881,6 +1923,7 @@ void analyzeCfg(
         prop.reset(new null_prop_t(params.check_verbose));
       intra_checker_t checker(analyzer, {prop});
       checker.run();
+      get_crab_os() << "Middle\n";
       CRAB_VERBOSE_IF(1,
           llvm::outs() << "Function " << m_fun.getName() << "\n";
           checker.show(crab::outs()));
