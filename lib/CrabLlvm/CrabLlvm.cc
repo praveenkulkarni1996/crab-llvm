@@ -46,6 +46,7 @@
 #include <memory>
 #include <functional>
 #include <map>
+#include <algorithm>
 
 #ifdef HAVE_DSA
 #include "dsa/DSNode.h"
@@ -1418,6 +1419,7 @@ namespace crab_llvm {
     return false;
   }
 
+  /* author: Praveen Kulkarni (pkulkarni@mpi-sws.org) */
   void recipeBuilder(Module &M, recipe_t &recipe) {
     std::vector<CrabDomain> domains = {INTERVALS, INTERVALS_CONGRUENCES, DIS_INTERVALS,
       TERMS_INTERVALS, WRAPPED_INTERVALS, ZONES_SPLIT_DBM, BOXES, OPT_OCT_APRON, PK_APRON,
@@ -1431,26 +1433,11 @@ namespace crab_llvm {
     }
   }
 
-
-// static bool update(invariant_map_t &table, 
-//       const llvm::BasicBlock &block, wrapper_dom_ptr absval) {
-//     bool already = false;
-//     auto it = table.find(&block);
-//     if (it == table.end()) {
-//       table.insert(std::make_pair(&block, absval));
-//     } else {
-//       it->second = absval;
-//       already = true;
-//     }
-//     return already;
-//   }
-
-
   void updateAssumptions(assumption_map_t &amap, invariant_map_t &imap) {
     // NOTE (assumption_map_t) and (invariant_map_t) are different implmentation of hashmaps
     // typedef llvm::DenseMap<const llvm::BasicBlock*, lin_cst_sys_t> assumption_map_t;
     // typedef llvm::DenseMap<const llvm::BasicBlock*, wrapper_dom_ptr> invariant_map_t;
-    // using BasicBlockPtr = const llvm::BasicBlock*;
+    // Converts previously deduced invariants into assumptions.
     for (auto key_val: imap) {
       auto block = key_val.first;
       auto linear_constraint_system = key_val.second->to_linear_constraints();
@@ -1556,7 +1543,7 @@ namespace crab_llvm {
         // m_post_map :: invariant_map_t
       }
 
-      for (auto ingredient_results : recipe_results) {
+      for (auto &ingredient_results : recipe_results) {
         Function &f = ingredient_results.first.first;
         CrabDomain dom = ingredient_results.first.second;
         QuickResults qres = ingredient_results.second;
