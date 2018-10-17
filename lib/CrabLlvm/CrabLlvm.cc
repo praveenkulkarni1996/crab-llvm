@@ -735,7 +735,6 @@ namespace crab_llvm {
           typedef pretty_printer_impl::assumption_annotation assume_annotation_t;
           std::vector<std::unique_ptr<block_annotation_t>> pool_annotations;
 
-          llvm::outs() << "\n" << "function " << m_fun.getName() << "\n";
           if (params.print_invars) {
             pool_annotations.emplace_back(
                 make_unique<inv_annotation_t>(m_vfac, results.premap, results.postmap, 
@@ -1162,7 +1161,8 @@ namespace crab_llvm {
 
               // --- print invariants and summaries
               if (params.print_invars && isTrackable(*F)) {
-                llvm::outs() << "\n" << "function " << F->getName () << "\n";
+                CRAB_VERBOSE_IF(1, get_crab_os()
+                 << "\n" << "function " << F->getName () << "\n";);
                 std::vector<std::unique_ptr<pretty_printer_impl::block_annotation>> annotations;
                 annotations.emplace_back(make_unique<pretty_printer_impl::invariant_annotation>
                     (m_vfac, results.premap, results.postmap,
@@ -1431,6 +1431,37 @@ namespace crab_llvm {
     }
   }
 
+
+// static bool update(invariant_map_t &table, 
+//       const llvm::BasicBlock &block, wrapper_dom_ptr absval) {
+//     bool already = false;
+//     auto it = table.find(&block);
+//     if (it == table.end()) {
+//       table.insert(std::make_pair(&block, absval));
+//     } else {
+//       it->second = absval;
+//       already = true;
+//     }
+//     return already;
+//   }
+
+
+  void updateAssumptions(assumption_map_t &amap, invariant_map_t &imap) {
+    // NOTE (assumption_map_t) and (invariant_map_t) are different implmentation of hashmaps
+    // typedef llvm::DenseMap<const llvm::BasicBlock*, lin_cst_sys_t> assumption_map_t;
+    // typedef llvm::DenseMap<const llvm::BasicBlock*, wrapper_dom_ptr> invariant_map_t;
+    // using BasicBlockPtr = const llvm::BasicBlock*;
+    for (auto key_val: imap) {
+      auto block = key_val.first;
+      auto linear_constraint_system = key_val.second->to_linear_constraints();
+      if (amap.count(block) == 0) {
+        amap.insert({block, linear_constraint_system});
+      } else {
+        amap[block] += linear_constraint_system;
+      }
+    }
+  }
+
   bool CrabLlvmPass::runOnModule (Module &M) {
     #ifdef HAVE_DSA
     m_mem.reset(
@@ -1478,7 +1509,7 @@ namespace crab_llvm {
       for(auto &ingredient: recipe) {
         llvm::Function &F = ingredient.first;
         CrabDomain domain = ingredient.second;
-        llvm::outs() << ingredient.first.getName() << ": " << ingredient.second << "\n";
+        // llvm::outs() << ingredient.first.getName() << ": " << ingredient.second << "\n";
 
         IntraCrabLlvm_Impl crab(ingredient.first, CrabTrackLev, m_mem, m_vfac, m_cfg_man, *m_tli);
 
@@ -1500,6 +1531,9 @@ namespace crab_llvm {
           case TERMS_DIS_INTERVALS:   analyzeCfg<term_dis_int_domain_t>(m_cfg_man.get_cfg(F), F, m_vfac, m_params, &F.getEntryBlock(), amap, nullptr,  res); break;
           default:                    assert(false);
         }
+
+        updateAssumptions(amap, m_pre_map);
+
         // print_checks(llvm::outs());
         // NOTES: 
         // m_checks_db  :: class(set<pair<crab::cfg::debug_info, check_kind_t>>);
@@ -1512,6 +1546,7 @@ namespace crab_llvm {
         QuickResults qres(get_total_safe_checks(), get_total_error_checks(), 
                           get_total_warning_checks(), 0); 
         recipe_results.push_back(std::make_pair(ingredient, qres));
+        llvm::outs() << "amap.size() = " << amap.size() << "\n";
         m_checks_db.clear();
         // releaseMemory();
 
@@ -1521,12 +1556,14 @@ namespace crab_llvm {
         // m_post_map :: invariant_map_t
       }
 
-      for(auto ingredient_results : recipe_results) {
+      for (auto ingredient_results : recipe_results) {
         Function &f = ingredient_results.first.first;
         CrabDomain dom = ingredient_results.first.second;
         QuickResults qres = ingredient_results.second;
-        llvm::outs() << f.getName() << " on " << dom_to_str(dom) << ": \t";
-        llvm::outs() << " = " << qres.safe << ", " << qres.error << ", " << qres.warning << "\n";
+        llvm::outs() << f.getName() << " on " << dom_to_str(dom) << ":\t"
+                     << "SAFE(" << qres.safe << "), " 
+                     << "ERROR(" << qres.error << "), " 
+                     << "WARNING(" << qres.warning << ")\n";
       }
       return false;
     }
@@ -1724,8 +1761,11 @@ void analyzeCfg(
     liveness_t *live,
     InvarianceAnalysisResults &results) {
 
+  get_crab_os() << "BEFORE SIZE = " << results.premap.size() << " " << results.postmap.size() << "\n";
+
   // -- we use the combined forward/backward analyzer
-    typedef intra_forward_backward_analyzer<cfg_ref_t,Dom> intra_analyzer_t;
+  using intra_analyzer_t = intra_forward_backward_analyzer<cfg_ref_t, Dom>;
+    // typedef intra_forward_backward_analyzer<cfg_ref_t,Dom> intra_analyzer_t;
     // -- checkers for assertions and nullity
     typedef intra_checker<intra_analyzer_t> intra_checker_t;
     typedef assert_property_checker<intra_analyzer_t> assert_prop_t;
@@ -1761,6 +1801,7 @@ void analyzeCfg(
       post_cond = Dom::bottom();
     }
 
+
     analyzer.run(basic_block_label_t(entry), Dom::top(), post_cond,
         !params.run_backward, crab_assumptions, live,
         params.widening_delay, params.narrowing_iters, params.widening_jumpset);
@@ -1770,8 +1811,8 @@ void analyzeCfg(
     // -- store invariants
     if (params.store_invariants || params.print_invars) {
       CRAB_VERBOSE_IF(1, get_crab_os() << "Storing invariants.\n");       
-      for (basic_block_label_t bl: boost::make_iterator_range(m_cfg->label_begin(),
-            m_cfg->label_end())) {
+      for (basic_block_label_t bl: 
+            boost::make_iterator_range(m_cfg->label_begin(), m_cfg->label_end())) {
         const BasicBlock *B = bl.get_basic_block();
         if (!B) continue; // we only store those which correspond to llvm basic blocks
 
@@ -1847,7 +1888,6 @@ void analyzeCfg(
         prop.reset(new null_prop_t(params.check_verbose));
       intra_checker_t checker(analyzer, {prop});
       checker.run();
-      get_crab_os() << "Middle\n";
       CRAB_VERBOSE_IF(1,
           llvm::outs() << "Function " << m_fun.getName() << "\n";
           checker.show(crab::outs()));
