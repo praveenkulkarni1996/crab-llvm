@@ -1437,7 +1437,7 @@ namespace crab_llvm {
       CRAB_VERBOSE_IF(1, get_crab_os() << "Number of functions in module = M.size() = " << M.size() << "\n";);
 
       king->buildAllCfg(M, m_mem, *m_tli);
-      
+
       std::vector<std::pair<llvm::Function&, CrabDomain> > recipe;
 
       typedef typename assumption_map_t::value_type binding_t;
@@ -1448,6 +1448,7 @@ namespace crab_llvm {
         if(isTrackable(F)) {
           recipe.push_back({F, INTERVALS});
           recipe.push_back({F, BOXES});
+          recipe.push_back({F, ZONES_SPLIT_DBM});
         }
       }
 
@@ -1457,8 +1458,6 @@ namespace crab_llvm {
         llvm::outs() << ingredient.first.getName() << ": " << ingredient.second << "\n";
 
         IntraCrabLlvm_Impl crab(ingredient.first, CrabTrackLev, m_mem, m_vfac, m_cfg_man, *m_tli);
-        // InvarianceAnalysisResults results = {m_pre_map, m_post_map, m_checks_db}; 
-
 
         m_params.dom = domain;
         m_params.run_liveness = false;
@@ -1479,6 +1478,7 @@ namespace crab_llvm {
           default:
             assert(false);
         }
+        print_checks(llvm::outs());
       }
 
       // return 0;
@@ -1863,7 +1863,8 @@ void analyzeCfg(
         pool_annotations.emplace_back(
             make_unique<assume_annotation_t>(*m_cfg, &assumption_analyzer));
       }
-      pretty_printer_impl::print_annotations(*m_cfg, pool_annotations);
+      if(false) // TODO(pkulkarni): removed to prevent output pollution. 
+        pretty_printer_impl::print_annotations(*m_cfg, pool_annotations);
     }
 
     CRAB_VERBOSE_IF(1, get_crab_os() << "In between comment.\n");
