@@ -1419,7 +1419,9 @@ namespace crab_llvm {
   }
 
   void recipeBuilder(Module &M, recipe_t &recipe) {
-    std::vector<CrabDomain> domains = {INTERVALS, PK_APRON};
+    std::vector<CrabDomain> domains = {INTERVALS, INTERVALS_CONGRUENCES, DIS_INTERVALS,
+      TERMS_INTERVALS, WRAPPED_INTERVALS, ZONES_SPLIT_DBM, BOXES, OPT_OCT_APRON, PK_APRON,
+      TERMS_ZONES, TERMS_DIS_INTERVALS};
     for (llvm::Function &F: M) {
       if (isTrackable(F)) {
         for (CrabDomain domain : domains) {
@@ -1471,13 +1473,18 @@ namespace crab_llvm {
       assumption_map_t assumption_map;
       assumption_map_t amap;
 
-      for(auto &F: M) {
-        if(isTrackable(F)) {
-          recipe.push_back({F, INTERVALS});
-          // recipe.push_back({F, BOXES});
-          // recipe.push_back({F, ZONES_SPLIT_DBM});
-        }
-      }
+      recipeBuilder(M, recipe);
+
+      // for(auto &F: M) {
+      //   if(isTrackable(F)) {
+      //     recipe.push_back({F, INTERVALS});
+
+
+
+      //     // recipe.push_back({F, BOXES});
+      //     // recipe.push_back({F, ZONES_SPLIT_DBM});
+      //   }
+      // }
 
       for(auto &ingredient: recipe) {
         llvm::Function &F = ingredient.first;
@@ -1502,10 +1509,9 @@ namespace crab_llvm {
           case PK_APRON:              analyzeCfg<pk_apron_domain_t>(m_cfg_man.get_cfg(F), F, m_vfac, m_params, &F.getEntryBlock(), amap, nullptr,  res); break;
           case TERMS_ZONES:           analyzeCfg<num_domain_t>(m_cfg_man.get_cfg(F), F, m_vfac, m_params, &F.getEntryBlock(), amap, nullptr,  res); break;
           case TERMS_DIS_INTERVALS:   analyzeCfg<term_dis_int_domain_t>(m_cfg_man.get_cfg(F), F, m_vfac, m_params, &F.getEntryBlock(), amap, nullptr,  res); break;
-          default:
-            assert(false);
+          default:                    assert(false);
         }
-        print_checks(llvm::outs());
+        // print_checks(llvm::outs());
         // NOTES: 
         // m_checks_db  :: class(set<pair<crab::cfg::debug_info, check_kind_t>>);
         // check_kind_t :: enum { _SAFE, _ERR, _WARN, _UNREACH }; 
@@ -1517,12 +1523,23 @@ namespace crab_llvm {
         QuickResults qres(get_total_safe_checks(), get_total_error_checks(), 
                           get_total_warning_checks(), 0); 
         recipe_results.push_back(std::make_pair(ingredient, qres));
-        releaseMemory();
+        m_checks_db.clear();
+        // releaseMemory();
+
 
         // invariant_map_t = llvm::DenseMap<const llvm::BasicBlock*, wrapper_dom_ptr>
         // m_pre_map :: invariant_map_t
         // m_post_map :: invariant_map_t
       }
+
+      for(auto ingredient_results : recipe_results) {
+        Function &f = ingredient_results.first.first;
+        CrabDomain dom = ingredient_results.first.second;
+        QuickResults qres = ingredient_results.second;
+        llvm::outs() << f.getName() << " on " << dom_to_str(dom) << ": \t";
+        llvm::outs() << " = " << qres.safe << ", " << qres.error << ", " << qres.warning << "\n";
+      }
+
 
       // return 0;
       // for (auto &F : M) {
