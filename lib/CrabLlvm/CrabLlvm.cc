@@ -1437,18 +1437,9 @@ namespace crab_llvm {
       CRAB_VERBOSE_IF(1, get_crab_os() << "Number of functions in module = M.size() = " << M.size() << "\n";);
 
       king->buildAllCfg(M, m_mem, *m_tli);
-      // king->printDomains(llvm::outs());
-      // king->runAnalyses();
-
-
+      
       std::vector<std::pair<llvm::Function&, CrabDomain> > recipe;
 
-
-
-      
-
-      // run On Function equivalents 
-      // explicit is better than implicit
       typedef typename assumption_map_t::value_type binding_t;
       assumption_map_t assumption_map;
       assumption_map_t amap;
@@ -1474,94 +1465,103 @@ namespace crab_llvm {
         InvarianceAnalysisResults res = {m_pre_map, m_post_map, m_checks_db};
 
         switch (domain) {
-          case INTERVALS: analyzeCfg<interval_domain_t>(m_cfg_man.get_cfg(F), F, m_vfac, m_params, &F.getEntryBlock(), amap, nullptr,  res); break;
-          case BOXES: analyzeCfg<boxes_domain_t>(m_cfg_man.get_cfg(F), F, m_vfac, m_params, &F.getEntryBlock(), amap, nullptr,  res); break;
+          case INTERVALS:             analyzeCfg<interval_domain_t>(m_cfg_man.get_cfg(F), F, m_vfac, m_params, &F.getEntryBlock(), amap, nullptr,  res); break;
+          case INTERVALS_CONGRUENCES: analyzeCfg<ric_domain_t>(m_cfg_man.get_cfg(F), F, m_vfac, m_params, &F.getEntryBlock(), amap, nullptr,  res); break;
+          case DIS_INTERVALS:         analyzeCfg<dis_interval_domain_t>(m_cfg_man.get_cfg(F), F, m_vfac, m_params, &F.getEntryBlock(), amap, nullptr,  res); break;
+          case TERMS_INTERVALS:       analyzeCfg<term_int_domain_t>(m_cfg_man.get_cfg(F), F, m_vfac, m_params, &F.getEntryBlock(), amap, nullptr,  res); break;
+          case WRAPPED_INTERVALS:     analyzeCfg<wrapped_interval_domain_t>(m_cfg_man.get_cfg(F), F, m_vfac, m_params, &F.getEntryBlock(), amap, nullptr,  res); break;
+          case ZONES_SPLIT_DBM:       analyzeCfg<split_dbm_domain_t>(m_cfg_man.get_cfg(F), F, m_vfac, m_params, &F.getEntryBlock(), amap, nullptr,  res); break;
+          case BOXES:                 analyzeCfg<boxes_domain_t>(m_cfg_man.get_cfg(F), F, m_vfac, m_params, &F.getEntryBlock(), amap, nullptr,  res); break;
+          case OPT_OCT_APRON:         analyzeCfg<opt_oct_apron_domain_t>(m_cfg_man.get_cfg(F), F, m_vfac, m_params, &F.getEntryBlock(), amap, nullptr,  res); break;
+          case PK_APRON:              analyzeCfg<pk_apron_domain_t>(m_cfg_man.get_cfg(F), F, m_vfac, m_params, &F.getEntryBlock(), amap, nullptr,  res); break;
+          case TERMS_ZONES:           analyzeCfg<num_domain_t>(m_cfg_man.get_cfg(F), F, m_vfac, m_params, &F.getEntryBlock(), amap, nullptr,  res); break;
+          case TERMS_DIS_INTERVALS:   analyzeCfg<term_dis_int_domain_t>(m_cfg_man.get_cfg(F), F, m_vfac, m_params, &F.getEntryBlock(), amap, nullptr,  res); break;
           default:
             assert(false);
         }
       }
 
-      return 0;
-      for (auto &F : M) {
-        if (!CrabInter && isTrackable(F)) {
-          IntraCrabLlvm_Impl crab(F, CrabTrackLev, m_mem, m_vfac, m_cfg_man, *m_tli);
-          InvarianceAnalysisResults results = {m_pre_map, m_post_map, m_checks_db};
-          // definiton of analyzeCFG
-          // void analyzeCfg(
-          //     cfg_t *m_cfg,
-          //     const Function &m_fun,
-          //     const llvm_variable_factory &m_vfac,
-          //     const AnalysisParams &params,
-          //     const BasicBlock *entry,
-          //     const assumption_map_t &assumptions, 
-          //     liveness_t *live,
-          //     InvarianceAnalysisResults &results)
+      // return 0;
+      // for (auto &F : M) {
+      //   if (!CrabInter && isTrackable(F)) {
+      //     IntraCrabLlvm_Impl crab(F, CrabTrackLev, m_mem, m_vfac, m_cfg_man, *m_tli);
+      //     InvarianceAnalysisResults results = {m_pre_map, m_post_map, m_checks_db};
+      //     // definiton of analyzeCFG
+      //     // void analyzeCfg(
+      //     //     cfg_t *m_cfg,
+      //     //     const Function &m_fun,
+      //     //     const llvm_variable_factory &m_vfac,
+      //     //     const AnalysisParams &params,
+      //     //     const BasicBlock *entry,
+      //     //     const assumption_map_t &assumptions, 
+      //     //     liveness_t *live,
+      //     //     InvarianceAnalysisResults &results)
 
-          m_params.dom = INTERVALS;
-          InvarianceAnalysisResults results2 = {m_pre_map, m_post_map, m_checks_db};
-          analyzeCfg<interval_domain_t>(
-            king->cfg_manager.get_cfg(F),
-            F,
-            m_vfac,
-            m_params, // TODO(pkulkarni): modify
-            &F.getEntryBlock(),
-            assumption_map,
-            nullptr,  // TODO(pkulkarni): modify
-            results2
-          );
-          print_checks(llvm::outs());
+      //     m_params.dom = INTERVALS;
+      //     InvarianceAnalysisResults results2 = {m_pre_map, m_post_map, m_checks_db};
+      //     analyzeCfg<interval_domain_t>(
+      //       king->cfg_manager.get_cfg(F),
+      //       F,
+      //       m_vfac,
+      //       m_params, // TODO(pkulkarni): modify
+      //       &F.getEntryBlock(),
+      //       assumption_map,
+      //       nullptr,  // TODO(pkulkarni): modify
+      //       results2
+      //     );
+      //     print_checks(llvm::outs());
 
-          // m_params.dom = INTERVALS;
-          // m_params.run_liveness = false;
-          // analyzeCfg<interval_domain_t>(
-          //   king->cfg_manager.get_cfg(F),
-          //   F,
-          //   m_vfac,
-          //   m_params, // TODO(pkulkarni): modify
-          //   &F.getEntryBlock(),
-          //   assumption_map_t(),
-          //   nullptr,  // TODO(pkulkarni): modify
-          //   results);
+      //     // m_params.dom = INTERVALS;
+      //     // m_params.run_liveness = false;
+      //     // analyzeCfg<interval_domain_t>(
+      //     //   king->cfg_manager.get_cfg(F),
+      //     //   F,
+      //     //   m_vfac,
+      //     //   m_params, // TODO(pkulkarni): modify
+      //     //   &F.getEntryBlock(),
+      //     //   assumption_map_t(),
+      //     //   nullptr,  // TODO(pkulkarni): modify
+      //     //   results);
 
-          int counter = 0;
-          for (const auto &BB : F) {
-            llvm::outs() << "counter = " << counter << "\n";
-            llvm::outs() << "PRE  :" << F.getName() << " : " << (get_pre(&BB, false)->to_linear_constraints()).size() << "\n";
-            (get_pre(&BB, false)->to_linear_constraints()).write(get_crab_os());
-            llvm::outs() << "POST :" << F.getName() << " : " << (get_post(&BB, false)->to_linear_constraints()).size() << "\n";
-            (get_post(&BB, false)->to_linear_constraints()).write(get_crab_os());
-            auto constraints = get_post(&BB, false)->to_linear_constraints();
-            assumption_map.insert(std::make_pair(&BB, constraints));
-          }
-          llvm::outs() << "AGAIN ONE  MORE TIME ....\n";
+      //     int counter = 0;
+      //     for (const auto &BB : F) {
+      //       llvm::outs() << "counter = " << counter << "\n";
+      //       llvm::outs() << "PRE  :" << F.getName() << " : " << (get_pre(&BB, false)->to_linear_constraints()).size() << "\n";
+      //       (get_pre(&BB, false)->to_linear_constraints()).write(get_crab_os());
+      //       llvm::outs() << "POST :" << F.getName() << " : " << (get_post(&BB, false)->to_linear_constraints()).size() << "\n";
+      //       (get_post(&BB, false)->to_linear_constraints()).write(get_crab_os());
+      //       auto constraints = get_post(&BB, false)->to_linear_constraints();
+      //       assumption_map.insert(std::make_pair(&BB, constraints));
+      //     }
+      //     llvm::outs() << "AGAIN ONE  MORE TIME ....\n";
 
-          // m_params.dom = ZONES_SPLIT_DBM;
-          // InvarianceAnalysisResults results2 = {m_pre_map, m_post_map, m_checks_db};
-          // analyzeCfg<split_dbm_domain_t>(
-          //   king->cfg_manager.get_cfg(F),
-          //   F,
-          //   m_vfac,
-          //   m_params, // TODO(pkulkarni): modify
-          //   &F.getEntryBlock(),
-          //   assumption_map_t(),
-          //   nullptr,  // TODO(pkulkarni): modify
-          //   results2
-          // );
+      //     // m_params.dom = ZONES_SPLIT_DBM;
+      //     // InvarianceAnalysisResults results2 = {m_pre_map, m_post_map, m_checks_db};
+      //     // analyzeCfg<split_dbm_domain_t>(
+      //     //   king->cfg_manager.get_cfg(F),
+      //     //   F,
+      //     //   m_vfac,
+      //     //   m_params, // TODO(pkulkarni): modify
+      //     //   &F.getEntryBlock(),
+      //     //   assumption_map_t(),
+      //     //   nullptr,  // TODO(pkulkarni): modify
+      //     //   results2
+      //     // );
 
-          m_params.dom = BOXES;
-          m_params.run_liveness = false;
-          analyzeCfg<boxes_domain_t>(
-            king->cfg_manager.get_cfg(F),
-            F,
-            m_vfac,
-            m_params, // TODO(pkulkarni): modify
-            &F.getEntryBlock(),
-            assumption_map,
-            nullptr,  // TODO(pkulkarni): modify
-            results);
-        }
-      }
-      return 0;
+      //     m_params.dom = BOXES;
+      //     m_params.run_liveness = false;
+      //     analyzeCfg<boxes_domain_t>(
+      //       king->cfg_manager.get_cfg(F),
+      //       F,
+      //       m_vfac,
+      //       m_params, // TODO(pkulkarni): modify
+      //       &F.getEntryBlock(),
+      //       assumption_map,
+      //       nullptr,  // TODO(pkulkarni): modify
+      //       results);
+      //   }
+      // }
+      return false;
     }
 
 
